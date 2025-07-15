@@ -1423,19 +1423,22 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             that the prompt corresponds to multi-modal items.
         """
         if isinstance(prompt, str):
+            print("111111111111111111111111111111111111111")
             if enable_hf_prompt_update:
+                print("1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                 return self._apply_hf_processor_text_mm(
                     prompt_text=prompt,
                     mm_items=mm_items,
                     hf_processor_mm_kwargs=hf_processor_mm_kwargs,
                     tokenization_kwargs=tokenization_kwargs,
                 )
-
+            print("1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
             prompt_ids = self._apply_hf_processor_text_only(
                 prompt, tokenization_kwargs)
         else:
+            print("22222222222222222222222222222222222222222222")
             prompt_ids = self._apply_hf_processor_tokens_only(prompt)
-
+        print("33333333333333333333333333333333333333333333333333333")
         mm_kwargs = self._apply_hf_processor_mm_only(
             mm_items=mm_items,
             hf_processor_mm_kwargs=hf_processor_mm_kwargs,

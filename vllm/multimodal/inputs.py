@@ -312,6 +312,7 @@ class MultiModalBatchedField(BaseMultiModalField):
         data: NestedTensors,
     ) -> Sequence[MultiModalFieldElem]:
         field_factory = self._field_factory(modality=modality, key=key)
+        print(f"############# MultiModalBatchedField(BaseMultiModalField)")
         return [field_factory(item) for item in data]
 
     def _reduce_data(self, batch: list[NestedTensors]) -> NestedTensors:
@@ -344,6 +345,7 @@ class MultiModalFlatField(BaseMultiModalField):
         key: str,
         data: NestedTensors,
     ) -> Sequence[MultiModalFieldElem]:
+        print(f"############# MultiModalFlatField(BaseMultiModalField)")
         field_factory = self._field_factory(modality=modality, key=key)
         if not is_list_of(self.slices, slice, check="all"):
             assert isinstance(data, torch.Tensor), \
@@ -624,14 +626,25 @@ class MultiModalKwargs(UserDict[str, NestedTensors]):
         # We assume that those fields are not used in vLLM
         elems_by_key = dict[str, Sequence[MultiModalFieldElem]]()
         keys_by_modality = defaultdict[str, set[str]](set)
+        print(f"****************config_by_key.items(): {config_by_key.items()}****************")
+        #print(f"****************hf_inputs.items(): {hf_inputs.items()}****************")
         for key, config in config_by_key.items():
+            print(f"****************key: {key}****************")
+            print(f"****************config modality: {config.modality}****************") 
+            print(f"****************key in hf_inputs.keys(): {key in hf_inputs.keys()}****************")            
             batch = hf_inputs.get(key)
+            print(f"****************batch type: {type(batch)}****************")  
+            print(f"****************batch shape: {None if isinstance(batch, type(None)) else batch.shape}****************")  
+            #print(f"****************batch: {batch}****************")  
             if batch is not None:
                 elems = config.build_elems(key, batch)
+                #print(f"****************elems: {elems}****************")
                 if len(elems) > 0:
                     elems_by_key[key] = elems
                     keys_by_modality[config.modality].add(key)
 
+        #print(f"****************elems_by_key: {elems_by_key}****************")
+        print(f"****************keys_by_modality: {keys_by_modality}****************")
         items = list[MultiModalKwargsItem]()
         for modality, keys in keys_by_modality.items():
             elems_in_modality = {k: elems_by_key[k] for k in keys}
@@ -646,7 +659,7 @@ class MultiModalKwargs(UserDict[str, NestedTensors]):
             for item_idx in range(batch_size):
                 elems = [v[item_idx] for v in elems_in_modality.values()]
                 items.append(MultiModalKwargsItem.from_elems(elems))
-
+        #print(f"****************items for MultiModalKwargs: {items}****************")
         return MultiModalKwargs.from_items(items)
 
     @staticmethod
@@ -673,7 +686,7 @@ class MultiModalKwargs(UserDict[str, NestedTensors]):
         items: Optional[Sequence[MultiModalKwargsItem]] = None,
     ) -> None:
         super().__init__(data)
-
+        #print(f"IIIIIIIIIIIIIII items: {items}")
         items_by_modality = full_groupby(items or [], key=lambda x: x.modality)
         self._items_by_modality = dict(items_by_modality)
 
