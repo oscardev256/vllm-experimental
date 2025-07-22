@@ -17,6 +17,8 @@ from vllm.config import VllmConfig
 from transformers import WhisperConfig
 from transformers.models.whisper.modeling_whisper import WhisperEncoder
 from vllm.sequence import IntermediateTensors
+#from vllm.utils import LazyLoader, is_list_of
+from vllm.utils import is_list_of
 
 from qwen_vl_utils import process_vision_info
 
@@ -62,11 +64,21 @@ def _qwen2vl_field_config(hf_inputs: Mapping[str, torch.Tensor]):
         #audio_sizes = audio_length.prod(-1)
         #print(f'hf_inputs["audio"].shape: {hf_inputs["audio_mels"].shape}')
         #audio_sizes = torch.tensor([hf_inputs["audio_mels"].shape[0], hf_inputs["audio_mels"].shape[1]])
-        audio_sizes = torch.tensor([hf_inputs["audio_mels"].shape[1]])
-        #audio_sizes = audio_length.prod(-1)
-    else:
-        audio_length = torch.empty((0, 3))
+        audio_length = torch.tensor([hf_inputs["audio_mels"].shape[1]]).unsqueeze(0)
         audio_sizes = audio_length.prod(-1)
+    else:
+        audio_length = torch.empty((0, 1))
+        audio_sizes = audio_length.prod(-1)
+        #audio_sizes = torch.tensor([])
+    print(f"===============================================image_grid_thw shape: {image_grid_thw.shape}")
+    print(f"===============================================image_grid_thw: {image_grid_thw}")
+    print(f"===============================================image_grid_sizes shape: {image_grid_sizes.shape}")
+    print(f"===============================================image_grid_sizes: {image_grid_sizes}")
+    print(f"===============================================video_grid_thw shape: {video_grid_thw.shape}")
+    print(f"===============================================video_grid_thw: {video_grid_thw}")         
+    print(f"===============================================video_grid_sizes shape: {video_grid_sizes.shape}")
+    print(f"===============================================video_grid_sizes: {video_grid_sizes}")        
+    print(f"===============================================audio_sizes shape: {audio_sizes.shape}")
     print(f"===============================================audio_sizes: {audio_sizes}")
     #print(f"audio_length: {type(audio_length)}, audio: {audio_length}")
     #audio_sizes = audio_length.prod(-1)
@@ -99,7 +111,7 @@ def _qwen2vl_audio_field_config(hf_inputs):
     #base["audio"] = audio
     #print(f'base["audio"] = {base["audio"]}')
     return base
-
+    '''
 class Qwen2VLAudioMultiModalDataParser(MultiModalDataParser):
 
     def _parse_image_data(
@@ -132,6 +144,7 @@ class Qwen2VLAudioMultiModalDataParser(MultiModalDataParser):
 
         return super()._parse_video_data(data)
     '''
+    '''
     def _parse_audio_data(
         self,
         data#: Union[dict[str, torch.Tensor], ModalityData[VideoItem]],
@@ -147,8 +160,8 @@ class Qwen2VLAudioMultiModalDataParser(MultiModalDataParser):
 def _ensure_16k(wav: np.ndarray, sr: int) -> np.ndarray:
     """Resample to 16kHz if needed, cast to float32."""
     wav = wav.astype(np.float32)
-    if sr != 16_000:
-        wav = librosa.resample(wav, orig_sr=sr, target_sr=16_000)
+    #if sr != 16_000:
+    wav = librosa.resample(wav, orig_sr=sr, target_sr=16_000)
     return wav
 
 
@@ -164,10 +177,62 @@ def compute_audio_pad_count(n_mel_frames: int, cnn_total_stride: int = 2) -> int
     """Return the number of audio tokens after CNN down‑sampling."""
     return np.ceil(n_mel_frames / cnn_total_stride) 
 
-class Qwen2VLAudioMultiModalProcessor(Qwen2VLMultiModalProcessor):
 
-    #def _get_data_parser(self) -> MultiModalDataParser:
-    #    return Qwen2VLMultiModalDataParser()
+class Qwen2VLAudioMultiModalDataParser(MultiModalDataParser):
+
+    #def __init__(self):
+    #    super().__init__(target_sr=16000)
+
+    def __init__(
+        self,
+        *,
+        target_sr: Optional[float] = None,
+        audio_resample_method: Literal["librosa", "scipy"] = "librosa",
+        video_needs_metadata: bool = False,
+    ) -> None:
+        super().__init__(target_sr=16000)
+
+    def _parse_image_data(
+        self,
+        data: Union[dict[str, torch.Tensor], ModalityData[ImageItem]],
+    ) -> Optional[ModalityDataItems[Any, Any]]:
+        print("Inside qwen2_vl_audio.py, _parse_image_data...")
+        #print(f"data shape: {len(data)}")
+        #if len(data) > 0:
+        #    print(f"data type: {type(data[0])}")
+        #a = torch.tensor([0])
+        #b = a[100]
+        if isinstance(data, dict):
+            return DictEmbeddingItems(
+                data,
+                modality="image",
+                required_fields={"image_embeds", "image_grid_thw"},
+                fields_factory=_qwen2vl_field_config,
+            )
+
+        return super()._parse_image_data(data)
+
+    def _parse_video_data(
+        self,
+        data: Union[dict[str, torch.Tensor], ModalityData[VideoItem]],
+    ) -> Optional[ModalityDataItems[Any, Any]]:
+        print("Inside qwen2_vl_audio.py, _parse_video_data....")       
+        #a = torch.tensor([0])
+        #b = a[100]     
+        if isinstance(data, dict):
+            return DictEmbeddingItems(
+                data,
+                modality="video",
+                required_fields={"video_embeds", "video_grid_thw"},
+                fields_factory=_qwen2vl_field_config,
+            )
+
+        return super()._parse_video_data(data)
+
+#class Qwen2VLAudioMultiModalProcessor(Qwen2VLMultiModalProcessor):
+class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingInfo]):
+    def _get_data_parser(self) -> MultiModalDataParser:
+        return Qwen2VLAudioMultiModalDataParser()
 
     def _call_hf_processor(
         self,
@@ -176,10 +241,10 @@ class Qwen2VLAudioMultiModalProcessor(Qwen2VLMultiModalProcessor):
         mm_kwargs: Mapping[str, object],
         tok_kwargs: Mapping[str, object],
     ) -> BatchFeature:
-        #print(f"Inside _call_hf_processor, mm_kwargs: {mm_kwargs}")
-        #print(f"Inside _call_hf_processor, mm_data: {mm_data}")
-        #print(f"Inside _call_hf_processor, tok_kwargs: {tok_kwargs}")
-        #print(f"Inside _call_hf_processor, prompt: {prompt}")
+        print(f"Inside _call_hf_processor, mm_kwargs: {mm_kwargs}")
+        print(f"Inside _call_hf_processor, mm_data: {mm_data}")
+        print(f"Inside _call_hf_processor, tok_kwargs: {tok_kwargs}")
+        #rint(f"Inside _call_hf_processor, prompt: {prompt}")
         mm_kwargs = self.info._get_image_processor_kwargs(**mm_kwargs)
         result = self.info.ctx.call_hf_processor(
             self.info.get_hf_processor(**mm_kwargs),
@@ -189,34 +254,42 @@ class Qwen2VLAudioMultiModalProcessor(Qwen2VLMultiModalProcessor):
         print(f"Input to _call_hf_processor, mm_kwargs: {mm_kwargs}")
         print(f"Input to _call_hf_processor, mm_data: {mm_data}")
         print(f"Input to _call_hf_processor, tok_kwargs: {tok_kwargs}")
-        print(f"Input to _call_hf_processor, prompt: {prompt}")        
+        print(f"Input to _call_hf_processor, prompt: {prompt}")
+        if "images" in mm_data:
+            #result["audio"] = torch.tensor([[0]])
+            image_inputs = mm_data["images"]
+            #print(f"~~~~~~~~~~~~~~~~ _call_hf_processor: Image inputs shape: {len(image_inputs)}")
+            if len(image_inputs) > 1:
+                ap[78]              
         if "audios" in mm_data:
+            #ap[78]
             #result["audio"] = torch.tensor([[0]])
             audio_inputs = mm_data["audios"]
             mel_list: List[np.ndarray] = []
             token_counts: List[int] = []
+            #print(f"~~~~~~~~~~~~~~~~ _call_hf_processor: Audio inputs shape: {len(audio_inputs)}")
             #for wav, sr in audio_inputs:
             for wav in audio_inputs:
                 wav_np = wav.cpu().numpy() if isinstance(wav, torch.Tensor) else wav
-                #wav_np = _ensure_16k(wav_np, sr)
+                #wav_np = _ensure_16k(wav_np, 16000)
                 mel, n_frames = _waveform_to_logmel(wav_np)
                 mel_list.append(mel)
                 #token_counts.append(compute_audio_pad_count(n_frames, self.cnn_total_stride))
                 #token_counts.append(compute_audio_pad_count(n_frames, 4))
-                token_counts.append(compute_audio_pad_count(n_frames, 1))
+                #token_counts.append(compute_audio_pad_count(n_frames, 1))
             audio_mels = np.stack(mel_list, axis=0)  # (B, 80, T)
             audio_mels = torch.from_numpy(audio_mels)
-            print(f"~~~~~~~~~~~~~~~~Main Code: audio_mels.shape: {audio_mels.shape}")
+            #print(f"~~~~~~~~~~~~~~~~ _call_hf_processor: audio_mels.shape: {audio_mels.shape}")
             if audio_mels.shape[1] == 80:                           # (B, 80, T) → (B, T, 80)
                 audio_feats = audio_mels.transpose(1, 2).contiguous()
             else:
                 audio_feats = audio_mels
-            #audio_feats = audio_feats[:,:12,:]
-            print(f"~~~~~~~~~~~~~~~~Main Code: audio_feats.shape: {audio_feats.shape}")
+            audio_feats = audio_feats[:,:12,:]
+            #print(f"~~~~~~~~~~~~~~~~ _call_hf_processor: audio_feats.shape: {audio_feats.shape}")
             result["audio_mels"] = audio_feats
             #result["audio_mels"] = torch.from_numpy(audio_mels[0])          
-            #result["audio_length"] = torch.tensor([12])#torch.tensor(token_counts)
-            result["audio_length"] = torch.tensor([3000])#torch.tensor(token_counts)
+            result["audio_length"] = torch.tensor([12])#torch.tensor(token_counts)
+            #result["audio_length"] = torch.tensor([3000])#torch.tensor(token_counts)
         #print(f"Output from _call_hf_processor: {type(result)}, result: {result}")
         return result        
 #        return self.info.ctx.call_hf_processor(
@@ -246,7 +319,7 @@ class Qwen2VLAudioMultiModalProcessor(Qwen2VLMultiModalProcessor):
 
         merge_length = image_processor.merge_size**2
 
-        def get_replacement_qwen2vl(item_idx: int, modality: str):
+        def get_replacement_qwen2vl(item_idx: int, modality: str): # Expansion of multimedia padding tokens.
             print("Inside get_replacement_qwen2vl")
             if modality == "audio":
                 #grid_thw = torch.tensor([1])#out_mm_kwargs[modality][item_idx]
@@ -307,9 +380,25 @@ class Qwen2VLAudioProcessingInfo(Qwen2VLProcessingInfo):
     def get_supported_mm_limits(self) -> Mapping[str, Optional[int]]:
         return {"image": None, "video": None, "audio": None}    
 
+
+class Qwen2VLAudioDummyInputsBuilder(Qwen2VLDummyInputsBuilder):
+
+    def get_dummy_text(self, mm_counts: Mapping[str, int]) -> str:
+        num_images = mm_counts.get("image", 0)
+        num_videos = mm_counts.get("video", 0)
+        num_audios = mm_counts.get("audio", 0)
+
+        hf_processor = self.info.get_hf_processor()
+        image_token: str = hf_processor.image_token
+        video_token: str = hf_processor.video_token
+        audio_token: str = "<|audio_pad|>"
+        print(f"Inside Qwen2VLDummyInputsBuilder, dummy data: {image_token * num_images + video_token * num_videos + audio_token * num_audios}")
+        return image_token * num_images + video_token * num_videos + audio_token * num_audios
+
+
 @MULTIMODAL_REGISTRY.register_processor(Qwen2VLAudioMultiModalProcessor,
                                         info=Qwen2VLAudioProcessingInfo,
-                                        dummy_inputs=Qwen2VLDummyInputsBuilder)
+                                        dummy_inputs=Qwen2VLAudioDummyInputsBuilder)
 class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
     hf_to_vllm_mapper = WeightsMapper(
         orig_to_new_prefix={
@@ -322,6 +411,7 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
 
     @classmethod
     def get_placeholder_str(cls, modality: str, i: int) -> Optional[str]:
+        print("Inside get_placeholder_str( get_placeholder_str( get_placeholder_str( get_placeholder_str( get_placeholder_str( ...........")
         if modality.startswith("image"):
             return "<|vision_start|><|image_pad|><|vision_end|>"
         if modality.startswith("video"):
@@ -347,14 +437,17 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
         if audio_mels.shape[-1] == 80:                           # (T, 80) → (80, T)
             audio_feats = audio_mels.transpose(-2, -1).contiguous()
             # Initialize zeros and copy original values
-            audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
-            audio_feats_expanded[:, :12] = audio_feats
+            #audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
+            #audio_feats_expanded[:, :12] = audio_feats
 
         else:
             audio_feats = audio_mels               
 
+        audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
+        audio_feats_expanded[:, :12] = audio_feats
         print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
         print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
+        #whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
         whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
 
         audio_hidden = (
