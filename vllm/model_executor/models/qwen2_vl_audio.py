@@ -288,8 +288,8 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
             #print(f"~~~~~~~~~~~~~~~~ _call_hf_processor: audio_feats.shape: {audio_feats.shape}")
             result["audio_mels"] = audio_feats
             #result["audio_mels"] = torch.from_numpy(audio_mels[0])          
-            result["audio_length"] = torch.tensor([12])#torch.tensor(token_counts)
-            #result["audio_length"] = torch.tensor([3000])#torch.tensor(token_counts)
+            #result["audio_length"] = torch.tensor([12])#torch.tensor(token_counts)
+            result["audio_length"] = torch.tensor([3000])#torch.tensor(token_counts)
         #print(f"Output from _call_hf_processor: {type(result)}, result: {result}")
         return result        
 #        return self.info.ctx.call_hf_processor(
@@ -443,12 +443,12 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
         else:
             audio_feats = audio_mels               
 
-        audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
-        audio_feats_expanded[:, :12] = audio_feats
-        print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
-        print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
-        #whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
-        whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
+        #audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
+        #audio_feats_expanded[:, :12] = audio_feats
+        #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
+        #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
+        whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
+        #whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
 
         audio_hidden = (
             whisper_out.last_hidden_state
