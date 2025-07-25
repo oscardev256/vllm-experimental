@@ -106,9 +106,10 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
                 audio_feats = audio_mels.transpose(1, 2).contiguous()
             else:
                 audio_feats = audio_mels
-            audio_feats = audio_feats[:,:12,:]
+            #audio_feats = audio_feats[:,:12,:]
             result["audio_mels"] = audio_feats
-            result["audio_length"] = torch.tensor([12])          
+            #result["audio_length"] = torch.tensor([12])
+            result["audio_length"] = torch.tensor([3000]) 
         return result        
 
     def _get_prompt_updates(
@@ -218,11 +219,11 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
         else:
             audio_feats = audio_mels               
 
-        audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
-        audio_feats_expanded[:, :12] = audio_feats
+        #audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
+        #audio_feats_expanded[:, :12] = audio_feats
         #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
         #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
-        #whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
+        whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
         whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
 
         audio_hidden = (
