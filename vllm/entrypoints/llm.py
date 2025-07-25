@@ -454,6 +454,11 @@ class LLM:
             considered legacy and may be deprecated in the future. You should
             instead pass them via the `inputs` parameter.
         """
+        print("Inside LLM.generate...")
+        #print(f"Prompt type: {type(prompts)}")
+        #print(f"Prompt length: {len(prompts)}")
+        #print(f"Prompt[0] type: {type(prompts[0])}")
+        #print(f"Prompt[0] keys: {(prompts[0].keys())}")
         runner_type = self.llm_engine.model_config.runner_type
         if runner_type not in ["generate", "transcription"]:
             messages = [
@@ -502,7 +507,11 @@ class LLM:
         # Add any modality specific loras to the corresponding prompts
         lora_request = self._get_modality_specific_lora_reqs(
             parsed_prompts, lora_request)
-
+        #print(f"parsed_prompts: {parsed_prompts}")
+        #print(f"parsed_prompts type: {type(parsed_prompts)}")
+        #print(f"parsed_prompts type: {len(parsed_prompts)}")
+        #print(f"Sampling params: {sampling_params}")
+        #gen[8]
         self._validate_and_add_requests(
             prompts=parsed_prompts,
             params=sampling_params,
@@ -1616,6 +1625,9 @@ class LLM:
             prompts = [prompts]
 
         num_requests = len(prompts)
+
+        #print(f"num_requests: {num_requests}")
+        #print(f"params: {(params)}")
         if isinstance(params, Sequence) and len(params) != num_requests:
             raise ValueError("The lengths of prompts and params "
                              "must be the same.")

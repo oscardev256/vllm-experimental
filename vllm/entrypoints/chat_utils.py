@@ -565,7 +565,7 @@ class BaseMultiModalItemTracker(ABC, Generic[_T]):
                 "increase this limit if the model supports it.")
 
         self._items_by_modality[modality].append(item)
-
+        print("Inside chat utils...........................")
         return model_cls.get_placeholder_str(modality, current_count)
 
     @abstractmethod

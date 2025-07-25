@@ -1423,7 +1423,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             that the prompt corresponds to multi-modal items.
         """
         if isinstance(prompt, str):
-            print("111111111111111111111111111111111111111")
+            #print("111111111111111111111111111111111111111")
             if enable_hf_prompt_update:
                 print("1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                 return self._apply_hf_processor_text_mm(
@@ -1432,13 +1432,13 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
                     hf_processor_mm_kwargs=hf_processor_mm_kwargs,
                     tokenization_kwargs=tokenization_kwargs,
                 )
-            print("1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+            #print("1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
             prompt_ids = self._apply_hf_processor_text_only(
                 prompt, tokenization_kwargs)
         else:
-            print("22222222222222222222222222222222222222222222")
+            #print("22222222222222222222222222222222222222222222")
             prompt_ids = self._apply_hf_processor_tokens_only(prompt)
-        print("33333333333333333333333333333333333333333333333333333")
+        #print("33333333333333333333333333333333333333333333333333333")
         mm_kwargs = self._apply_hf_processor_mm_only(
             mm_items=mm_items,
             hf_processor_mm_kwargs=hf_processor_mm_kwargs,
@@ -1594,7 +1594,8 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             hf_processor_mm_kwargs=hf_processor_mm_kwargs,
             tokenization_kwargs=tokenization_kwargs,
         )
-
+        print(f"mm_cache_items: {mm_cache_items}")
+        print(f"mm_missing_data: {mm_missing_data}")
         # NOTE: `prompt` does not correspond to `mm_missing_data_items`,
         # so we can't apply prompt updates until the new multimodal
         # items are combined with the cached multimodal items
@@ -1831,8 +1832,9 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
         3. Extract information about the placeholder tokens from the
            processed token IDs.
         """
+        print("Inside BaseMultiModalProcessor, before _to_mm_items...")
         mm_items = self._to_mm_items(mm_data)
-
+        print("Inside BaseMultiModalProcessor, after _to_mm_items...")
         if tokenization_kwargs is None:
             tokenization_kwargs = {}
 
@@ -1848,7 +1850,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             tokenization_kwargs=tokenization_kwargs,
             return_mm_hashes=return_mm_hashes,
         )
-
+        #print(f"mm_hashes: {mm_hashes}")
         # NOTE: tokenization_kwargs are not required to init processor
         prompt_ids, prompt, mm_placeholders = self._maybe_apply_prompt_updates(
             mm_items=mm_items,

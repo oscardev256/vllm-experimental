@@ -423,6 +423,7 @@ class MultiModalDataParser:
         self,
         data: ModalityData[ImageItem],
     ) -> Optional[ModalityDataItems[Any, Any]]:
+        print("Inside parse.py, _parse_image_data()...")
         if self._is_empty(data):
             return None
 
@@ -486,7 +487,7 @@ class MultiModalDataParser:
     def parse_mm_data(self,
                       mm_data: MultiModalDataDict) -> MultiModalDataItems:
         subparsers = self._get_subparsers()
-
+        print("Inside parse.py, parse_mm_data()")
         mm_items = MultiModalDataItems()
         for k, v in mm_data.items():
             if k not in subparsers:
@@ -494,6 +495,7 @@ class MultiModalDataParser:
 
             # ignore empty embedding data
             if (parsed_data := subparsers[k](v)) is not None:
+                print(f"Inside parse.py, parse_mm_data(), modality parsed: {k}")
                 mm_items[k] = parsed_data
 
         return mm_items

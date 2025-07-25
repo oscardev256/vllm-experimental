@@ -722,6 +722,7 @@ class Qwen2VLMultiModalDataParser(MultiModalDataParser):
         self,
         data: Union[dict[str, torch.Tensor], ModalityData[ImageItem]],
     ) -> Optional[ModalityDataItems[Any, Any]]:
+        print("Inside qwen2_vl.py, _parse_image_data()")
         if isinstance(data, dict):
             return DictEmbeddingItems(
                 data,
@@ -986,7 +987,7 @@ class Qwen2VLDummyInputsBuilder(BaseDummyInputsBuilder[Qwen2VLProcessingInfo]):
         hf_processor = self.info.get_hf_processor()
         image_token: str = hf_processor.image_token
         video_token: str = hf_processor.video_token
-
+        print(f"Inside Qwen2VLDummyInputsBuilder, dummy data: {image_token * num_images + video_token * num_videos}")
         return image_token * num_images + video_token * num_videos
 
     def get_dummy_mm_data(

@@ -413,7 +413,7 @@ class InputPreprocessor:
         return_mm_hashes: bool = False,
     ) -> Union[TokenInputs, MultiModalInputs]:
         prompt_text = parsed_content["prompt"]
-
+        print("Inside  _process_text after parsing...")
         inputs: Union[TokenInputs, MultiModalInputs]
         if multi_modal_data := parsed_content.get("multi_modal_data"):
             inputs = self._process_multimodal(
@@ -506,6 +506,7 @@ class InputPreprocessor:
                 return_mm_hashes=return_mm_hashes,
             )
         if parsed["type"] == "text":
+            print("Inside _prompt_to_llm_inputs(, parsed['type'] == 'text' if clause")
             return self._process_text(
                 parsed["content"],
                 tokenization_kwargs=tokenization_kwargs,
