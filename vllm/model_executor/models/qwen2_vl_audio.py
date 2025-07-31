@@ -224,7 +224,7 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
         #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
         #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
         whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
-        whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
+        #whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
 
         audio_hidden = (
             whisper_out.last_hidden_state
