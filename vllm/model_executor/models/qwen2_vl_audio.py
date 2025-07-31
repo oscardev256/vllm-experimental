@@ -2,7 +2,7 @@ from typing import Tuple
 from transformers import WhisperConfig
 from transformers.models.whisper.modeling_whisper import WhisperEncoder
 
-from qwen_vl_utils import process_vision_info
+#from qwen_vl_utils import process_vision_info
 
 import numpy as np
 import whisper
