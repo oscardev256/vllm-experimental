@@ -96,20 +96,21 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
             audio_inputs = mm_data["audios"]
             mel_list: List[np.ndarray] = []
             token_counts: List[int] = []
-            for wav in audio_inputs:
-                wav_np = wav.cpu().numpy() if isinstance(wav, torch.Tensor) else wav
+            for wav_np in audio_inputs:
+                #wav_np = wav.cpu().numpy() if isinstance(wav, torch.Tensor) else wav
                 mel, n_frames = _waveform_to_logmel(wav_np)
                 mel_list.append(mel)
-            audio_mels = np.stack(mel_list, axis=0)  # (B, 80, T)
+            audio_mels = np.stack(mel_list, axis=0)
             audio_mels = torch.from_numpy(audio_mels)
-            if audio_mels.shape[1] == 80:                           # (B, 80, T) → (B, T, 80)
-                audio_feats = audio_mels.transpose(1, 2).contiguous()
-            else:
-                audio_feats = audio_mels
+            #if audio_mels.shape[1] == 80:                           # (B, 80, T) → (B, T, 80)
+            #    audio_feats = audio_mels.transpose(1, 2).contiguous()
+            #else:
+            #    audio_feats = audio_mels
             #audio_feats = audio_feats[:,:12,:]
+            audio_feats = audio_mels[:,:,:12]
             result["audio_mels"] = audio_feats
-            #result["audio_length"] = torch.tensor([12])
-            result["audio_length"] = torch.tensor([3000]) 
+            result["audio_length"] = torch.tensor([12])
+            #result["audio_length"] = torch.tensor([3000]) 
         return result        
 
     def _get_prompt_updates(
@@ -211,20 +212,11 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
     def _process_audio_input(
             self, audio_input):
 
-        audio_mels = audio_input.to(dtype=torch.bfloat16)
+        #audio_mels = audio_input.to(dtype=torch.bfloat16)
+        audio_feats = audio_input.to(dtype=torch.bfloat16)            
 
-        if audio_mels.shape[-1] == 80:                           # (T, 80) → (80, T)
-            audio_feats = audio_mels.transpose(-2, -1).contiguous()
-
-        else:
-            audio_feats = audio_mels               
-
-        #audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
-        #audio_feats_expanded[:, :12] = audio_feats
-        #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats.unsqueeze(0).shape)}")
-        #print(f"audio_feats.unsqueeze(0) shape: {(audio_feats_expanded.unsqueeze(0).shape)}")
+        audio_feats_expanded = torch.zeros((80, 3000), dtype=audio_feats.dtype, device=audio_feats.device)
         whisper_out = self.audio_encoder(audio_feats.unsqueeze(0))
-        #whisper_out = self.audio_encoder(audio_feats_expanded.unsqueeze(0))
 
         audio_hidden = (
             whisper_out.last_hidden_state
@@ -250,7 +242,7 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
                 input_ids, inputs_embeds, multimodal_embeddings,
                 [self.config.image_token_id, self.config.video_token_id, self.audio_token_id])
         return inputs_embeds
-
+    
     def _parse_and_validate_multimodal_inputs(self, **kwargs: object) -> dict:
         modalities = {}
         # Preserve the order of modalities if there are multiple of them
@@ -268,7 +260,7 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
                 modalities["audios"] = kwargs["audio_mels"][0][0]#torch.tensor([0])#self._parse_and_validate_audio_input(**kwargs)
 
         return modalities
-
+    
     def get_multimodal_embeddings(self,
                                   **kwargs: object) -> MultiModalEmbeddings:
 
