@@ -101,16 +101,17 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
                 mel, n_frames = _waveform_to_logmel(wav_np)
                 mel_list.append(mel)
             audio_mels = np.stack(mel_list, axis=0)
-            audio_mels = torch.from_numpy(audio_mels)
+            #audio_mels = torch.from_numpy(audio_mels)
             #if audio_mels.shape[1] == 80:                           # (B, 80, T) → (B, T, 80)
             #    audio_feats = audio_mels.transpose(1, 2).contiguous()
             #else:
             #    audio_feats = audio_mels
             #audio_feats = audio_feats[:,:12,:]
-            audio_feats = audio_mels[:,:,:12]
-            result["audio_mels"] = audio_feats
-            result["audio_length"] = torch.tensor([12])
-            #result["audio_length"] = torch.tensor([3000]) 
+            #audio_feats = audio_mels[:,:,:12]
+            result["audio_mels"] = torch.from_numpy(audio_mels)
+            #result["audio_mels"] = audio_feats
+            #result["audio_length"] = torch.tensor([12])
+            result["audio_length"] = torch.tensor([3000]) 
         return result        
 
     def _get_prompt_updates(
