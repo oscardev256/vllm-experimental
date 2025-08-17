@@ -137,7 +137,14 @@ class BenchmarkDataset(ABC):
         if mm_content is not None:
             if isinstance(mm_content, list):
                 # If mm_content is a list, extend the content with all items
-                content.extend(mm_content)
+                # Make sure we're not dealing with nested lists
+                for item in mm_content:
+                    if isinstance(item, list):
+                        # If item is itself a list, extend with its contents
+                        content.extend(item)
+                    else:
+                        # Otherwise append the item directly
+                        content.append(item)
             else:
                 # If mm_content is a single item, append it
                 content.append(mm_content)
