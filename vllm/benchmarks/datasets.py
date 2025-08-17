@@ -1888,7 +1888,9 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                     # For audio+image datasets, we need to handle both
                     # Convert audio to base64 for JSON serialization
                     try:
+                        print("DEBUG: Starting audio encoding process...")
                         from vllm.multimodal.utils import encode_audio_base64
+                        print("DEBUG: Successfully imported encode_audio_base64")
                         logger.debug(f"Encoding audio: shape={y.shape}, sr={sr}")
                         audio_base64 = encode_audio_base64(y, sr)
                         logger.debug(f"Audio encoded successfully, length={len(audio_base64)}")
