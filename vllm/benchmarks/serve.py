@@ -1018,7 +1018,15 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
         print(f"First sample preview: prompt_len={first_req.prompt_len}, "
               f"has_multimodal={first_req.multi_modal_data is not None}")
         if first_req.multi_modal_data:
-            print(f"Multimodal keys: {list(first_req.multi_modal_data.keys())}")
+            if isinstance(first_req.multi_modal_data, dict):
+                print(f"Multimodal keys: {list(first_req.multi_modal_data.keys())}")
+            elif isinstance(first_req.multi_modal_data, list):
+                print(f"Multimodal items: {len(first_req.multi_modal_data)} items")
+                for i, item in enumerate(first_req.multi_modal_data):
+                    if isinstance(item, dict):
+                        print(f"  Item {i}: type={item.get('type', 'unknown')}")
+            else:
+                print(f"Multimodal data type: {type(first_req.multi_modal_data)}")
     goodput_config_dict = check_goodput_args(args)
 
     # Collect the sampling parameters.
