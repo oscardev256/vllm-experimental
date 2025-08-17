@@ -1009,7 +1009,16 @@ async def main_async(args: argparse.Namespace) -> dict[str, Any]:
             "'--dataset-path' if required.")
 
     # Load the dataset.
+    print(f"Loading dataset: {args.dataset_name} from {args.dataset_path}")
+    print(f"Requesting {args.num_prompts} samples...")
     input_requests = get_samples(args, tokenizer)
+    print(f"✅ Dataset loaded successfully! Got {len(input_requests)} samples")
+    if input_requests:
+        first_req = input_requests[0]
+        print(f"First sample preview: prompt_len={first_req.prompt_len}, "
+              f"has_multimodal={first_req.multi_modal_data is not None}")
+        if first_req.multi_modal_data:
+            print(f"Multimodal keys: {list(first_req.multi_modal_data.keys())}")
     goodput_config_dict = check_goodput_args(args)
 
     # Collect the sampling parameters.
