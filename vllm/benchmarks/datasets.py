@@ -1852,23 +1852,17 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 image_content = None
                 audio_content = None
                 
-                print(f"DEBUG: user_content has {len(user_content)} items")
-                for i, content in enumerate(user_content):
-                    print(f"DEBUG: content[{i}] type: {content.get('type', 'no-type')}")
+                for content in user_content:
                     if content["type"] == "image":
                         image_content = content["image"]
-                        print("DEBUG: Found image content")
                     elif content["type"] == "audio":
                         audio_content = content["audio"]
-                        print("DEBUG: Found audio content")
                 
                 # Process image like other vision datasets
                 if image_content is not None:
                     mm_content = process_image(image_content)
-                    print("DEBUG: Processed image content")
                 
                 # Add audio like ASRDataset if we have both image and audio
-                print(f"DEBUG: audio_content is None: {audio_content is None}")
                 if audio_content is not None:
                     # Extract audio array and sample rate like ASRDataset
                     wav_input = audio_content
@@ -1894,12 +1888,8 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                     # For audio+image datasets, we need to handle both
                     # Convert audio to base64 for JSON serialization
                     try:
-                        print("DEBUG: Starting audio encoding process...")
                         from vllm.multimodal.utils import encode_audio_base64
-                        print("DEBUG: Successfully imported encode_audio_base64")
-                        logger.debug(f"Encoding audio: shape={y.shape}, sr={sr}")
                         audio_base64 = encode_audio_base64(y, sr)
-                        logger.debug(f"Audio encoded successfully, length={len(audio_base64)}")
                         audio_content = {
                             "type": "input_audio",
                             "input_audio": {
@@ -1911,15 +1901,13 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         if mm_content is None:
                             # Audio only case (like ASRDataset)
                             mm_content = audio_content
-                            logger.debug("Set mm_content to audio_content only")
                         else:
                             # Audio+Image case - create list with both image and audio
                             if not isinstance(mm_content, list):
                                 mm_content = [mm_content]
                             mm_content.append(audio_content)
-                            logger.debug(f"Added audio to existing content, final type: {type(mm_content)}")
                     except Exception as e:
-                        # Catch all exceptions and log them
+                        # Fallback for when encoding fails
                         logger.warning(f"Failed to encode audio as base64: {e}")
                         if mm_content is None:
                             mm_content = {"audio": (y, sr)}
