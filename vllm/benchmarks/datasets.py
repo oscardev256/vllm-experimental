@@ -1813,17 +1813,26 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
         Returns:
             List of SampleRequest objects
         """
+        logger.info(f"AudioPromptCocoDataset.sample() starting with num_requests={num_requests}")
         output_len = (output_len if output_len is not None else self.DEFAULT_OUTPUT_LEN)
         sampled_requests = []
         
+        logger.info("Starting to iterate through dataset...")
+        item_count = 0
         for item in self.data:
+            item_count += 1
+            logger.debug(f"Processing item {item_count}")
+            if item_count % 10 == 0:
+                logger.info(f"Processed {item_count} items, sampled {len(sampled_requests)} requests")
             if len(sampled_requests) >= num_requests:
                 break
                 
             try:
+                logger.debug(f"Formatting sample {item_count}")
                 # Format the sample into conversation format
                 conversation = self._format_sample(item)
                 
+                logger.debug(f"Extracting content from conversation")
                 # Extract prompt (system + user messages)
                 system_content = conversation[0]["content"][0]["text"]
                 user_content = conversation[1]["content"]
@@ -1839,12 +1848,14 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 # Process multimodal content
                 mm_content = {}
                 
+                logger.debug(f"Processing image content")
                 # Process image
                 for content in user_content:
                     if content["type"] == "image":
                         mm_content.update(process_image(content["image"]))
                         break
                 
+                logger.debug(f"Processing audio content")
                 # Process audio - pass raw data for process_vision_info to handle
                 for content in user_content:
                     if content["type"] == "audio":
@@ -1854,9 +1865,11 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         mm_content["audio"] = raw_audio
                         break
                 
+                logger.debug(f"Tokenizing prompt")
                 # Calculate prompt length
                 prompt_len = len(tokenizer(prompt_text).input_ids)
                 
+                logger.debug(f"Applying chat formatting")
                 # Apply chat formatting if enabled
                 if enable_multimodal_chat:
                     prompt = self.apply_multimodal_chat_transformation(
@@ -1865,6 +1878,7 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 else:
                     prompt = prompt_text
                 
+                logger.debug(f"Creating SampleRequest")
                 sampled_requests.append(
                     SampleRequest(
                         prompt=prompt,
@@ -1873,6 +1887,7 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         multi_modal_data=mm_content,
                     )
                 )
+                logger.debug(f"Successfully processed item {item_count}")
                 
             except (KeyError, ValueError, TypeError) as e:
                 logger.warning(f"Skipping sample due to data error: {e}")
@@ -1881,5 +1896,8 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 logger.error(f"Unexpected error processing sample: {e}")
                 raise
         
+        logger.info(f"Finished processing {item_count} items, got {len(sampled_requests)} valid samples")
+        logger.info("Calling maybe_oversample_requests...")
         self.maybe_oversample_requests(sampled_requests, num_requests)
+        logger.info(f"AudioPromptCocoDataset.sample() completed, returning {len(sampled_requests)} requests")
         return sampled_requests
