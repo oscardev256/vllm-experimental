@@ -1781,17 +1781,40 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
     
     def _extract_audio_data(self, wav_input):
         """
-        Extract raw audio data in format expected by process_vision_info/fetch_audio.
+        Convert audio data to base64 format expected by vLLM server.
         
         Args:
             wav_input: Audio input from HuggingFace dataset (example["wav"])
             
         Returns:
-            Raw audio data that fetch_audio() can process
+            Base64 encoded audio URL for vLLM server
         """
-        # Pass through the raw HF dataset audio format
-        # fetch_audio() in process_vision_info will handle the processing
-        return wav_input
+        # Import here to avoid circular imports
+        from vllm.multimodal.utils import encode_audio_base64
+        import soundfile as sf
+        import io
+        
+        # Handle HuggingFace Audio format
+        if isinstance(wav_input, dict):
+            if 'array' in wav_input and 'sampling_rate' in wav_input:
+                # Standard HF Audio format
+                audio_array = wav_input['array']
+                sample_rate = wav_input['sampling_rate']
+            else:
+                raise ValueError(f"Expected HF audio format with 'array' and 'sampling_rate', got: {wav_input.keys()}")
+        else:
+            raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
+        
+        # Convert to base64 format expected by vLLM
+        audio_base64 = encode_audio_base64(audio_array, sample_rate)
+        
+        # Return in OpenAI-compatible format
+        return {
+            "type": "audio_url",
+            "audio_url": {
+                "url": f"data:audio/wav;base64,{audio_base64}"
+            }
+        }
         
     def sample(
         self,
@@ -1856,13 +1879,13 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         break
                 
                 logger.debug(f"Processing audio content")
-                # Process audio - pass raw data for process_vision_info to handle
+                # Process audio - convert to base64 format for vLLM server
                 for content in user_content:
                     if content["type"] == "audio":
-                        # Extract raw audio data that process_vision_info/fetch_audio can handle
-                        raw_audio = self._extract_audio_data(content["audio"])
-                        # Store in format expected by vLLM multimodal processing
-                        mm_content["audio"] = raw_audio
+                        # Convert to base64 format expected by vLLM server
+                        audio_content = self._extract_audio_data(content["audio"])
+                        # Merge audio content into mm_content
+                        mm_content.update(audio_content)
                         break
                 
                 logger.debug(f"Tokenizing prompt")
