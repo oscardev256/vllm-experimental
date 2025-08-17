@@ -1779,37 +1779,19 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
             {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
         ]
     
-    def _process_audio(self, wav_input) -> tuple[np.ndarray, int]:
+    def _extract_audio_data(self, wav_input):
         """
-        Process audio waveform into format expected by vLLM (simple tuple format).
+        Extract raw audio data in format expected by process_vision_info/fetch_audio.
         
         Args:
-            wav_input: Audio input (HF Audio dict with 'bytes'/'path' or numpy array)
+            wav_input: Audio input from HuggingFace dataset (example["wav"])
             
         Returns:
-            Tuple of (waveform, sample_rate) matching ASRDataset format
+            Raw audio data that fetch_audio() can process
         """
-        # Handle HuggingFace Audio format
-        if isinstance(wav_input, dict):
-            if 'bytes' in wav_input and wav_input['bytes'] is not None:
-                # Load audio from bytes
-                audio_bytes = wav_input['bytes']
-                # Use librosa to load audio from bytes
-                wav_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
-            elif 'path' in wav_input and wav_input['path'] is not None:
-                # Load audio from path
-                wav_array, sr = librosa.load(wav_input['path'], sr=16000, mono=True)
-            else:
-                raise ValueError(f"Audio dict must have 'bytes' or 'path', got: {wav_input.keys()}")
-        else:
-            # Direct numpy array
-            wav_array = wav_input
-            if not isinstance(wav_array, np.ndarray):
-                wav_array = np.array(wav_array)
-            sr = 16000  # Default sample rate
-                
-        # Return simple tuple format like ASRDataset
-        return wav_array, sr
+        # Pass through the raw HF dataset audio format
+        # fetch_audio() in process_vision_info will handle the processing
+        return wav_input
         
     def sample(
         self,
@@ -1863,11 +1845,13 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         mm_content.update(process_image(content["image"]))
                         break
                 
-                # Process audio - use simple tuple format like ASRDataset
+                # Process audio - pass raw data for process_vision_info to handle
                 for content in user_content:
                     if content["type"] == "audio":
-                        wav_array, sr = self._process_audio(content["audio"])
-                        mm_content["audio"] = (wav_array, sr)
+                        # Extract raw audio data that process_vision_info/fetch_audio can handle
+                        raw_audio = self._extract_audio_data(content["audio"])
+                        # Store in format expected by vLLM multimodal processing
+                        mm_content["audio"] = raw_audio
                         break
                 
                 # Calculate prompt length
