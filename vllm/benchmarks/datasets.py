@@ -62,6 +62,11 @@ except ImportError:
     whisper = PlaceholderModule("whisper")
 
 try:
+    import io
+except ImportError:
+    io = PlaceholderModule("io")
+
+try:
     from vllm.utils import FlexibleArgumentParser
 except ImportError:
     from argparse import ArgumentParser as FlexibleArgumentParser
@@ -1690,12 +1695,7 @@ class PrefixRepetitionRandomDataset(BenchmarkDataset):
 # -----------------------------------------------------------------------------
 
 
-def _waveform_to_logmel(wav: np.ndarray) -> tuple[np.ndarray, int]:
-    """Pad/trim to 30 s and build Whisper log-Mel spectrogram."""
-    wav_t = torch.from_numpy(wav) if isinstance(wav, np.ndarray) else wav
-    wav_t = whisper.pad_or_trim(wav_t, length=30 * 16_000)
-    mel = whisper.log_mel_spectrogram(wav_t)  # (80, frames)
-    return mel.cpu().numpy(), mel.shape[-1]
+# Removed _waveform_to_logmel function - not needed for benchmarking
 
 
 class AudioPromptCocoDataset(HuggingFaceDataset):
@@ -1779,21 +1779,20 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
             {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
         ]
     
-    def _process_audio(self, wav_input) -> dict:
+    def _process_audio(self, wav_input) -> tuple[np.ndarray, int]:
         """
-        Process audio waveform into format expected by the model.
+        Process audio waveform into format expected by vLLM (simple tuple format).
         
         Args:
             wav_input: Audio input (HF Audio dict with 'bytes'/'path' or numpy array)
             
         Returns:
-            Dictionary with processed audio data
+            Tuple of (waveform, sample_rate) matching ASRDataset format
         """
         # Handle HuggingFace Audio format
         if isinstance(wav_input, dict):
             if 'bytes' in wav_input and wav_input['bytes'] is not None:
                 # Load audio from bytes
-                import io
                 audio_bytes = wav_input['bytes']
                 # Use librosa to load audio from bytes
                 wav_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
@@ -1807,15 +1806,10 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
             wav_array = wav_input
             if not isinstance(wav_array, np.ndarray):
                 wav_array = np.array(wav_array)
+            sr = 16000  # Default sample rate
                 
-        # Convert to log-mel spectrogram using Whisper preprocessing
-        mel, n_frames = _waveform_to_logmel(wav_array)
-        
-        return {
-            "type": "audio",
-            "audio": mel,  # Use mel spectrogram 
-            "sample_rate": 16000,  # Whisper standard
-        }
+        # Return simple tuple format like ASRDataset
+        return wav_array, sr
         
     def sample(
         self,
@@ -1869,11 +1863,11 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         mm_content.update(process_image(content["image"]))
                         break
                 
-                # Process audio
+                # Process audio - use simple tuple format like ASRDataset
                 for content in user_content:
                     if content["type"] == "audio":
-                        audio_data = self._process_audio(content["audio"])
-                        mm_content["audio"] = audio_data
+                        wav_array, sr = self._process_audio(content["audio"])
+                        mm_content["audio"] = (wav_array, sr)
                         break
                 
                 # Calculate prompt length
@@ -1896,9 +1890,12 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                     )
                 )
                 
-            except Exception as e:
-                logger.warning(f"Skipping sample due to error: {e}")
+            except (KeyError, ValueError, TypeError) as e:
+                logger.warning(f"Skipping sample due to data error: {e}")
                 continue
+            except Exception as e:
+                logger.error(f"Unexpected error processing sample: {e}")
+                raise
         
         self.maybe_oversample_requests(sampled_requests, num_requests)
         return sampled_requests
