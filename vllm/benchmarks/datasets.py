@@ -1852,17 +1852,23 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 image_content = None
                 audio_content = None
                 
-                for content in user_content:
+                print(f"DEBUG: user_content has {len(user_content)} items")
+                for i, content in enumerate(user_content):
+                    print(f"DEBUG: content[{i}] type: {content.get('type', 'no-type')}")
                     if content["type"] == "image":
                         image_content = content["image"]
+                        print("DEBUG: Found image content")
                     elif content["type"] == "audio":
                         audio_content = content["audio"]
+                        print("DEBUG: Found audio content")
                 
                 # Process image like other vision datasets
                 if image_content is not None:
                     mm_content = process_image(image_content)
+                    print("DEBUG: Processed image content")
                 
                 # Add audio like ASRDataset if we have both image and audio
+                print(f"DEBUG: audio_content is None: {audio_content is None}")
                 if audio_content is not None:
                     # Extract audio array and sample rate like ASRDataset
                     wav_input = audio_content
