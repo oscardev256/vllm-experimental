@@ -172,11 +172,21 @@ async def async_request_openai_chat_completions(
 
     print(f"[DEBUG] Building OpenAI chat request:")
     print(f"[DEBUG]   api_url: {api_url}")
-    print(f"[DEBUG]   prompt: {request_func_input.prompt[:100]}...")
+    print(f"[DEBUG]   prompt type: {type(request_func_input.prompt)}")
     print(f"[DEBUG]   multi_modal_content: {request_func_input.multi_modal_content}")
 
-    content = [{"type": "text", "text": request_func_input.prompt}]
-    if request_func_input.multi_modal_content:
+    # Check if prompt is already in chat format (list with role/content structure)
+    if isinstance(request_func_input.prompt, list):
+        # Prompt is already in chat format, extract the content
+        messages = request_func_input.prompt
+        print(f"[DEBUG]   Using existing chat format with {len(messages)} messages")
+    else:
+        # Prompt is a string, create chat format
+        content = [{"type": "text", "text": request_func_input.prompt}]
+        print(f"[DEBUG]   prompt: {request_func_input.prompt[:100]}...")
+        messages = None
+    # Handle multimodal content only if prompt is not already in chat format
+    if not messages and request_func_input.multi_modal_content:
         mm_content = request_func_input.multi_modal_content
         print(f"[DEBUG]   mm_content type: {type(mm_content)}")
         if isinstance(mm_content, dict):
@@ -197,26 +207,34 @@ async def async_request_openai_chat_completions(
                 "for openai-chat"
             )
     
-    print(f"[DEBUG]   final content length: {len(content)}")
-    for i, item in enumerate(content):
-        if isinstance(item, dict):
-            item_type = item.get("type", "unknown")
-            print(f"[DEBUG]     content[{i}]: type={item_type}")
-            if item_type == "audio" and isinstance(item.get("audio"), tuple):
-                audio_tuple = item["audio"]
-                print(f"[DEBUG]       audio: (array_shape={audio_tuple[0].shape if hasattr(audio_tuple[0], 'shape') else type(audio_tuple[0])}, sr={audio_tuple[1]})")
-        else:
-            print(f"[DEBUG]     content[{i}]: {type(item)}")
-    payload = {
-        "model":
-        request_func_input.model_name
-        if request_func_input.model_name else request_func_input.model,
-        "messages": [
+    if messages:
+        # Use existing chat format
+        payload_messages = messages
+        print(f"[DEBUG]   Using chat format with {len(messages)} messages")
+    else:
+        # Create chat format from content
+        print(f"[DEBUG]   final content length: {len(content)}")
+        for i, item in enumerate(content):
+            if isinstance(item, dict):
+                item_type = item.get("type", "unknown")
+                print(f"[DEBUG]     content[{i}]: type={item_type}")
+                if item_type == "audio" and isinstance(item.get("audio"), tuple):
+                    audio_tuple = item["audio"]
+                    print(f"[DEBUG]       audio: (array_shape={audio_tuple[0].shape if hasattr(audio_tuple[0], 'shape') else type(audio_tuple[0])}, sr={audio_tuple[1]})")
+            else:
+                print(f"[DEBUG]     content[{i}]: {type(item)}")
+        payload_messages = [
             {
                 "role": "user",
                 "content": content
             },
-        ],
+        ]
+    
+    payload = {
+        "model":
+        request_func_input.model_name
+        if request_func_input.model_name else request_func_input.model,
+        "messages": payload_messages,
         "temperature":
         0.0,
         "max_completion_tokens":
