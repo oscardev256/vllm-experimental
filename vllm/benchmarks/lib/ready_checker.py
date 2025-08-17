@@ -62,12 +62,15 @@ async def wait_for_endpoint(
                 print(f"[DEBUG]   api_url: {test_input.api_url}")
                 print(f"[DEBUG]   multi_modal_content: {test_input.multi_modal_content}")
                 if hasattr(test_input, 'multi_modal_content') and test_input.multi_modal_content:
-                    print(f"[DEBUG]   multi_modal_content keys: {list(test_input.multi_modal_content.keys())}")
-                    for key, value in test_input.multi_modal_content.items():
-                        if key == "audio" and isinstance(value, tuple):
-                            print(f"[DEBUG]     {key}: (array_shape={value[0].shape if hasattr(value[0], 'shape') else type(value[0])}, sr={value[1]})")
-                        else:
-                            print(f"[DEBUG]     {key}: {type(value)}")
+                    if isinstance(test_input.multi_modal_content, dict):
+                        print(f"[DEBUG]   multi_modal_content keys: {list(test_input.multi_modal_content.keys())}")
+                        for key, value in test_input.multi_modal_content.items():
+                            if key == "audio" and isinstance(value, tuple):
+                                print(f"[DEBUG]     {key}: (array_shape={value[0].shape if hasattr(value[0], 'shape') else type(value[0])}, sr={value[1]})")
+                            else:
+                                print(f"[DEBUG]     {key}: {type(value)}")
+                    else:
+                        print(f"[DEBUG]   multi_modal_content is a list with {len(test_input.multi_modal_content)} items")
                 
                 output = await request_func(
                     request_func_input=test_input, session=session)
