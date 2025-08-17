@@ -1831,44 +1831,54 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                 
                 prompt_text = " ".join(text_parts)
                 
-                # Process multimodal content
-                mm_content = {}
+                # Process multimodal content - follow pattern of other datasets
+                mm_content = None
                 
-                logger.debug(f"Processing image content")
-                # Process image
+                logger.debug(f"Processing image and audio content")
+                # Check for image first
+                image_content = None
+                audio_content = None
+                
                 for content in user_content:
                     if content["type"] == "image":
-                        mm_content.update(process_image(content["image"]))
-                        break
+                        image_content = content["image"]
+                    elif content["type"] == "audio":
+                        audio_content = content["audio"]
                 
-                logger.debug(f"Processing audio content")
-                # Process audio - use same format as ASRDataset
-                for content in user_content:
-                    if content["type"] == "audio":
-                        # Extract audio array and sample rate like ASRDataset
-                        wav_input = content["audio"]
-                        if isinstance(wav_input, dict):
-                            if 'array' in wav_input and 'sampling_rate' in wav_input:
-                                # Standard HF Audio format
-                                y = wav_input['array']
-                                sr = wav_input['sampling_rate']
-                            elif 'bytes' in wav_input or 'path' in wav_input:
-                                # Streaming format - load manually
-                                if 'bytes' in wav_input and wav_input['bytes'] is not None:
-                                    import io
-                                    y, sr = librosa.load(io.BytesIO(wav_input['bytes']), sr=16000, mono=True)
-                                elif 'path' in wav_input and wav_input['path'] is not None:
-                                    y, sr = librosa.load(wav_input['path'], sr=16000, mono=True)
-                                else:
-                                    raise ValueError(f"Audio dict has bytes/path keys but both are None: {wav_input}")
+                # Process image like other vision datasets
+                if image_content is not None:
+                    mm_content = process_image(image_content)
+                
+                # Add audio like ASRDataset if we have both image and audio
+                if audio_content is not None:
+                    # Extract audio array and sample rate like ASRDataset
+                    wav_input = audio_content
+                    if isinstance(wav_input, dict):
+                        if 'array' in wav_input and 'sampling_rate' in wav_input:
+                            # Standard HF Audio format
+                            y = wav_input['array']
+                            sr = wav_input['sampling_rate']
+                        elif 'bytes' in wav_input or 'path' in wav_input:
+                            # Streaming format - load manually
+                            if 'bytes' in wav_input and wav_input['bytes'] is not None:
+                                import io
+                                y, sr = librosa.load(io.BytesIO(wav_input['bytes']), sr=16000, mono=True)
+                            elif 'path' in wav_input and wav_input['path'] is not None:
+                                y, sr = librosa.load(wav_input['path'], sr=16000, mono=True)
                             else:
-                                raise ValueError(f"Expected HF audio format, got: {wav_input.keys()}")
+                                raise ValueError(f"Audio dict has bytes/path keys but both are None: {wav_input}")
                         else:
-                            raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
-                        
-                        # Store in simple format like ASRDataset
+                            raise ValueError(f"Expected HF audio format, got: {wav_input.keys()}")
+                    else:
+                        raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
+                    
+                    # For audio+image datasets, we need to handle both
+                    if mm_content is None:
+                        # Audio only case (like ASRDataset)
+                        mm_content = {"audio": (y, sr)}
+                    else:
+                        # Audio+Image case - add audio to existing image content
                         mm_content["audio"] = (y, sr)
-                        break
                 
                 logger.debug(f"Tokenizing prompt")
                 # Calculate prompt length
