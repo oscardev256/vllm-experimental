@@ -222,6 +222,10 @@ class BenchmarkDataset(ABC):
                 requests.
             num_requests (int): The target number of requests.
         """
+        if len(requests) == 0:
+            logger.warning("No valid samples found in dataset. Cannot oversample.")
+            return
+            
         if len(requests) < num_requests:
             random.seed(self.random_seed)
             additional = random.choices(requests,
@@ -1741,7 +1745,14 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
         # Extract target class from the prompt text
         category_name = example["objects"]["category_name"][0]
         
-        if example["label"] == 0:
+        # Handle ClassLabel format (0=negative, 1=positive)
+        label_value = example["label"]
+        if isinstance(label_value, str):
+            is_positive = label_value == "positive"
+        else:
+            is_positive = label_value == 1
+            
+        if not is_positive:
             category_name = f"No {category_name} detected"
             y1, x1, y2, x2 = 0.0, 0.0, 0.0, 0.0
         else:
@@ -1768,16 +1779,35 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
             {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
         ]
     
-    def _process_audio(self, wav_array: np.ndarray) -> dict:
+    def _process_audio(self, wav_input) -> dict:
         """
         Process audio waveform into format expected by the model.
         
         Args:
-            wav_array: Audio waveform as numpy array
+            wav_input: Audio input (HF Audio dict with 'bytes'/'path' or numpy array)
             
         Returns:
             Dictionary with processed audio data
         """
+        # Handle HuggingFace Audio format
+        if isinstance(wav_input, dict):
+            if 'bytes' in wav_input and wav_input['bytes'] is not None:
+                # Load audio from bytes
+                import io
+                audio_bytes = wav_input['bytes']
+                # Use librosa to load audio from bytes
+                wav_array, sr = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
+            elif 'path' in wav_input and wav_input['path'] is not None:
+                # Load audio from path
+                wav_array, sr = librosa.load(wav_input['path'], sr=16000, mono=True)
+            else:
+                raise ValueError(f"Audio dict must have 'bytes' or 'path', got: {wav_input.keys()}")
+        else:
+            # Direct numpy array
+            wav_array = wav_input
+            if not isinstance(wav_array, np.ndarray):
+                wav_array = np.array(wav_array)
+                
         # Convert to log-mel spectrogram using Whisper preprocessing
         mel, n_frames = _waveform_to_logmel(wav_array)
         
