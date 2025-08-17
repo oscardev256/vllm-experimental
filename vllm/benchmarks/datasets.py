@@ -1823,9 +1823,9 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
         # Convert to base64 format expected by vLLM
         audio_base64 = encode_audio_base64(audio_array, sample_rate)
         
-        # Return in OpenAI-compatible input_audio format (not audio_url)
+        # Return in OpenAI-compatible input_audio format (as shown in vLLM examples)
         return {
-            "type": "input_audio",
+            "type": "input_audio", 
             "input_audio": {
                 "data": audio_base64,
                 "format": "wav"
@@ -1895,13 +1895,13 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         break
                 
                 logger.debug(f"Processing audio content")
-                # Process audio - convert to base64 format for vLLM server
+                # Process audio - add as separate key in mm_content
                 for content in user_content:
                     if content["type"] == "audio":
                         # Convert to base64 format expected by vLLM server
-                        audio_content = self._extract_audio_data(content["audio"])
-                        # Merge audio content into mm_content
-                        mm_content.update(audio_content)
+                        audio_data = self._extract_audio_data(content["audio"])
+                        # Store audio data properly without merging
+                        mm_content["input_audio"] = audio_data["input_audio"]
                         break
                 
                 logger.debug(f"Tokenizing prompt")
