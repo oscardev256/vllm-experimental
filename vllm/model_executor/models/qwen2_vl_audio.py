@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import List, Tuple
 from transformers import WhisperConfig
 from transformers.models.whisper.modeling_whisper import WhisperEncoder
 
