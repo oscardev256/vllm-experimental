@@ -170,32 +170,17 @@ async def async_request_openai_chat_completions(
     assert api_url.endswith(("chat/completions", "profile")), (
         "OpenAI Chat Completions API URL must end with 'chat/completions'.")
 
-    print(f"[DEBUG] Building OpenAI chat request:")
-    print(f"[DEBUG]   api_url: {api_url}")
-    print(f"[DEBUG]   prompt type: {type(request_func_input.prompt)}")
-    print(f"[DEBUG]   multi_modal_content: {request_func_input.multi_modal_content}")
-
     # Check if prompt is already in chat format (list with role/content structure)
     if isinstance(request_func_input.prompt, list):
         # Prompt is already in chat format, extract the content
         messages = request_func_input.prompt
-        print(f"[DEBUG]   Using existing chat format with {len(messages)} messages")
     else:
         # Prompt is a string, create chat format
         content = [{"type": "text", "text": request_func_input.prompt}]
-        print(f"[DEBUG]   prompt: {request_func_input.prompt[:100]}...")
         messages = None
     # Handle multimodal content only if prompt is not already in chat format
     if not messages and request_func_input.multi_modal_content:
         mm_content = request_func_input.multi_modal_content
-        print(f"[DEBUG]   mm_content type: {type(mm_content)}")
-        if isinstance(mm_content, dict):
-            print(f"[DEBUG]   mm_content keys: {list(mm_content.keys())}")
-            for key, value in mm_content.items():
-                if key == "audio" and isinstance(value, tuple):
-                    print(f"[DEBUG]     {key}: (array_shape={value[0].shape if hasattr(value[0], 'shape') else type(value[0])}, sr={value[1]})")
-                else:
-                    print(f"[DEBUG]     {key}: {type(value)}")
         
         if isinstance(mm_content, list):
             content.extend(mm_content)
@@ -210,19 +195,8 @@ async def async_request_openai_chat_completions(
     if messages:
         # Use existing chat format
         payload_messages = messages
-        print(f"[DEBUG]   Using chat format with {len(messages)} messages")
     else:
         # Create chat format from content
-        print(f"[DEBUG]   final content length: {len(content)}")
-        for i, item in enumerate(content):
-            if isinstance(item, dict):
-                item_type = item.get("type", "unknown")
-                print(f"[DEBUG]     content[{i}]: type={item_type}")
-                if item_type == "audio" and isinstance(item.get("audio"), tuple):
-                    audio_tuple = item["audio"]
-                    print(f"[DEBUG]       audio: (array_shape={audio_tuple[0].shape if hasattr(audio_tuple[0], 'shape') else type(audio_tuple[0])}, sr={audio_tuple[1]})")
-            else:
-                print(f"[DEBUG]     content[{i}]: {type(item)}")
         payload_messages = [
             {
                 "role": "user",
@@ -262,16 +236,9 @@ async def async_request_openai_chat_completions(
     st = time.perf_counter()
     most_recent_timestamp = st
     
-    print(f"[DEBUG] Sending request to {api_url}")
-    print(f"[DEBUG] Payload: {json.dumps(payload, indent=2)}")
-    
     try:
         async with session.post(url=api_url, json=payload,
                                 headers=headers) as response:
-            print(f"[DEBUG] Response status: {response.status}")
-            if response.status != 200:
-                response_text = await response.text()
-                print(f"[DEBUG] Error response: {response_text}")
             
             if response.status == 200:
                 async for chunk_bytes in response.content:
