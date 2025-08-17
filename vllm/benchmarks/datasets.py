@@ -1511,7 +1511,20 @@ class ASRDataset(HuggingFaceDataset):
                 skipped += 1
                 continue
 
-            mm_content = {"audio": (y, sr)}
+            # Convert audio to base64 for JSON serialization
+            try:
+                from vllm.multimodal.utils import encode_audio_base64
+                audio_base64 = encode_audio_base64(y, sr)
+                mm_content = {
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": audio_base64,
+                        "format": "wav"
+                    }
+                }
+            except ImportError:
+                # Fallback for when vllm is not available
+                mm_content = {"audio": (y, sr)}
             sampled_requests.append(
                 SampleRequest(
                     prompt=prompt,
@@ -1873,12 +1886,37 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
                     
                     # For audio+image datasets, we need to handle both
-                    if mm_content is None:
-                        # Audio only case (like ASRDataset)
-                        mm_content = {"audio": (y, sr)}
-                    else:
-                        # Audio+Image case - add audio to existing image content
-                        mm_content["audio"] = (y, sr)
+                    # Convert audio to base64 for JSON serialization
+                    try:
+                        from vllm.multimodal.utils import encode_audio_base64
+                        logger.debug(f"Encoding audio: shape={y.shape}, sr={sr}")
+                        audio_base64 = encode_audio_base64(y, sr)
+                        logger.debug(f"Audio encoded successfully, length={len(audio_base64)}")
+                        audio_content = {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": audio_base64,
+                                "format": "wav"
+                            }
+                        }
+                        
+                        if mm_content is None:
+                            # Audio only case (like ASRDataset)
+                            mm_content = audio_content
+                            logger.debug("Set mm_content to audio_content only")
+                        else:
+                            # Audio+Image case - create list with both image and audio
+                            if not isinstance(mm_content, list):
+                                mm_content = [mm_content]
+                            mm_content.append(audio_content)
+                            logger.debug(f"Added audio to existing content, final type: {type(mm_content)}")
+                    except Exception as e:
+                        # Catch all exceptions and log them
+                        logger.warning(f"Failed to encode audio as base64: {e}")
+                        if mm_content is None:
+                            mm_content = {"audio": (y, sr)}
+                        else:
+                            mm_content["audio"] = (y, sr)
                 
                 logger.debug(f"Tokenizing prompt")
                 # Calculate prompt length

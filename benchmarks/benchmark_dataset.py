@@ -1159,7 +1159,20 @@ class ASRDataset(HuggingFaceDataset):
                 skipped += 1
                 continue
 
-            mm_content = {"audio": (y, sr)}
+            # Convert audio to base64 for JSON serialization
+            try:
+                from vllm.multimodal.utils import encode_audio_base64
+                audio_base64 = encode_audio_base64(y, sr)
+                mm_content = {
+                    "type": "input_audio",
+                    "input_audio": {
+                        "data": audio_base64,
+                        "format": "wav"
+                    }
+                }
+            except ImportError:
+                # Fallback for when vllm is not available
+                mm_content = {"audio": (y, sr)}
             sampled_requests.append(
                 SampleRequest(
                     prompt=prompt,
