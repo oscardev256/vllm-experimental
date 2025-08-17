@@ -1823,11 +1823,12 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
         # Convert to base64 format expected by vLLM
         audio_base64 = encode_audio_base64(audio_array, sample_rate)
         
-        # Return in OpenAI-compatible format
+        # Return in OpenAI-compatible input_audio format (not audio_url)
         return {
-            "type": "audio_url",
-            "audio_url": {
-                "url": f"data:audio/wav;base64,{audio_base64}"
+            "type": "input_audio",
+            "input_audio": {
+                "data": audio_base64,
+                "format": "wav"
             }
         }
         
