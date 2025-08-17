@@ -56,13 +56,42 @@ async def wait_for_endpoint(
 
             # ping the endpoint using request_func
             try:
+                print(f"[DEBUG] Attempting readiness check with test_input:")
+                print(f"[DEBUG]   prompt: {test_input.prompt[:100]}...")
+                print(f"[DEBUG]   model: {test_input.model}")
+                print(f"[DEBUG]   api_url: {test_input.api_url}")
+                print(f"[DEBUG]   multi_modal_content: {test_input.multi_modal_content}")
+                if hasattr(test_input, 'multi_modal_content') and test_input.multi_modal_content:
+                    print(f"[DEBUG]   multi_modal_content keys: {list(test_input.multi_modal_content.keys())}")
+                    for key, value in test_input.multi_modal_content.items():
+                        if key == "audio" and isinstance(value, tuple):
+                            print(f"[DEBUG]     {key}: (array_shape={value[0].shape if hasattr(value[0], 'shape') else type(value[0])}, sr={value[1]})")
+                        else:
+                            print(f"[DEBUG]     {key}: {type(value)}")
+                
                 output = await request_func(
                     request_func_input=test_input, session=session)
+                
+                print(f"[DEBUG] Readiness check response:")
+                print(f"[DEBUG]   success: {output.success}")
+                print(f"[DEBUG]   error_code: {getattr(output, 'error_code', None)}")
+                print(f"[DEBUG]   error_text: {getattr(output, 'error_text', None)}")
+                if hasattr(output, 'generated_text'):
+                    print(f"[DEBUG]   generated_text: {output.generated_text[:200] if output.generated_text else None}...")
+                
                 if output.success:
                     pbar.close()
                     return output
-            except aiohttp.ClientConnectorError:
+                else:
+                    print(f"[DEBUG] Readiness check failed, will retry...")
+                    
+            except aiohttp.ClientConnectorError as e:
+                print(f"[DEBUG] Connection error during readiness check: {e}")
                 pass
+            except Exception as e:
+                print(f"[DEBUG] Unexpected error during readiness check: {type(e).__name__}: {e}")
+                import traceback
+                traceback.print_exc()
             
             # retry after a delay
             sleep_duration = min(retry_interval, remaining)
