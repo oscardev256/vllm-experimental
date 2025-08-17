@@ -1779,59 +1779,6 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
             {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
         ]
     
-    def _extract_audio_data(self, wav_input):
-        """
-        Convert audio data to base64 format expected by vLLM server.
-        
-        Args:
-            wav_input: Audio input from HuggingFace dataset (example["wav"])
-            
-        Returns:
-            Base64 encoded audio URL for vLLM server
-        """
-        # Import here to avoid circular imports
-        from vllm.multimodal.utils import encode_audio_base64
-        import numpy as np
-        
-        # Handle HuggingFace Audio format
-        if isinstance(wav_input, dict):
-            if 'array' in wav_input and 'sampling_rate' in wav_input:
-                # Standard HF Audio format (normal loading)
-                audio_array = wav_input['array']
-                sample_rate = wav_input['sampling_rate']
-            elif 'bytes' in wav_input or 'path' in wav_input:
-                # Streaming HF Audio format - need to load manually
-                if 'bytes' in wav_input and wav_input['bytes'] is not None:
-                    # Load from bytes
-                    import io
-                    audio_bytes = wav_input['bytes']
-                    audio_array, sample_rate = librosa.load(io.BytesIO(audio_bytes), sr=16000, mono=True)
-                elif 'path' in wav_input and wav_input['path'] is not None:
-                    # Load from path
-                    audio_array, sample_rate = librosa.load(wav_input['path'], sr=16000, mono=True)
-                else:
-                    raise ValueError(f"Audio dict has bytes/path keys but both are None: {wav_input}")
-            else:
-                raise ValueError(f"Expected HF audio format with 'array'/'sampling_rate' or 'bytes'/'path', got: {wav_input.keys()}")
-        else:
-            raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
-        
-        # Ensure audio_array is numpy array
-        if not isinstance(audio_array, np.ndarray):
-            audio_array = np.array(audio_array, dtype=np.float32)
-        
-        # Convert to base64 format expected by vLLM
-        audio_base64 = encode_audio_base64(audio_array, sample_rate)
-        
-        # Return in OpenAI-compatible input_audio format (as shown in vLLM examples)
-        return {
-            "type": "input_audio", 
-            "input_audio": {
-                "data": audio_base64,
-                "format": "wav"
-            }
-        }
-        
     def sample(
         self,
         tokenizer: PreTrainedTokenizerBase,
@@ -1895,13 +1842,32 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
                         break
                 
                 logger.debug(f"Processing audio content")
-                # Process audio - add as separate key in mm_content
+                # Process audio - use same format as ASRDataset
                 for content in user_content:
                     if content["type"] == "audio":
-                        # Convert to base64 format expected by vLLM server
-                        audio_data = self._extract_audio_data(content["audio"])
-                        # Store audio data properly without merging
-                        mm_content["input_audio"] = audio_data["input_audio"]
+                        # Extract audio array and sample rate like ASRDataset
+                        wav_input = content["audio"]
+                        if isinstance(wav_input, dict):
+                            if 'array' in wav_input and 'sampling_rate' in wav_input:
+                                # Standard HF Audio format
+                                y = wav_input['array']
+                                sr = wav_input['sampling_rate']
+                            elif 'bytes' in wav_input or 'path' in wav_input:
+                                # Streaming format - load manually
+                                if 'bytes' in wav_input and wav_input['bytes'] is not None:
+                                    import io
+                                    y, sr = librosa.load(io.BytesIO(wav_input['bytes']), sr=16000, mono=True)
+                                elif 'path' in wav_input and wav_input['path'] is not None:
+                                    y, sr = librosa.load(wav_input['path'], sr=16000, mono=True)
+                                else:
+                                    raise ValueError(f"Audio dict has bytes/path keys but both are None: {wav_input}")
+                            else:
+                                raise ValueError(f"Expected HF audio format, got: {wav_input.keys()}")
+                        else:
+                            raise ValueError(f"Expected HF audio dict, got: {type(wav_input)}")
+                        
+                        # Store in simple format like ASRDataset
+                        mm_content["audio"] = (y, sr)
                         break
                 
                 logger.debug(f"Tokenizing prompt")
