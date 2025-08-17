@@ -28,6 +28,11 @@ from PIL import Image
 from transformers import PreTrainedTokenizerBase
 from typing_extensions import deprecated
 
+try:
+    import torch
+except ImportError:
+    torch = PlaceholderModule("torch")
+
 from vllm.lora.request import LoRARequest
 from vllm.lora.utils import get_adapter_absolute_path
 from vllm.multimodal import MultiModalDataDict
@@ -50,6 +55,11 @@ try:
     import librosa
 except ImportError:
     librosa = PlaceholderModule("librosa")
+
+try:
+    import whisper
+except ImportError:
+    whisper = PlaceholderModule("whisper")
 
 try:
     from vllm.utils import FlexibleArgumentParser
@@ -696,6 +706,9 @@ def get_samples(args, tokenizer) -> list[SampleRequest]:
             args.hf_split = "train"
         elif args.dataset_path in ASRDataset.SUPPORTED_DATASET_PATHS:
             dataset_class = ASRDataset
+            args.hf_split = "train"
+        elif args.dataset_path in AudioPromptCocoDataset.SUPPORTED_DATASET_PATHS:
+            dataset_class = AudioPromptCocoDataset
             args.hf_split = "train"
         elif args.dataset_path in MLPerfDataset.SUPPORTED_DATASET_PATHS:
             dataset_class = MLPerfDataset
@@ -1666,3 +1679,196 @@ class PrefixRepetitionRandomDataset(BenchmarkDataset):
 
         random.shuffle(requests)
         return requests
+
+
+# -----------------------------------------------------------------------------
+# Audio Prompt COCO Dataset Implementation  
+# -----------------------------------------------------------------------------
+
+
+def _waveform_to_logmel(wav: np.ndarray) -> tuple[np.ndarray, int]:
+    """Pad/trim to 30 s and build Whisper log-Mel spectrogram."""
+    wav_t = torch.from_numpy(wav) if isinstance(wav, np.ndarray) else wav
+    wav_t = whisper.pad_or_trim(wav_t, length=30 * 16_000)
+    mel = whisper.log_mel_spectrogram(wav_t)  # (80, frames)
+    return mel.cpu().numpy(), mel.shape[-1]
+
+
+class AudioPromptCocoDataset(HuggingFaceDataset):
+    """
+    Audio Prompt COCO Dataset for audio-visual object detection benchmarking.
+    
+    This dataset is designed for Vision Audio Language Models specialized in 
+    recognizing speech commands for object detection. It combines images, audio
+    prompts, and object detection labels for multi-modal evaluation.
+    
+    The dataset contains:
+    - Images from COCO dataset
+    - Audio prompts asking about objects in the images  
+    - Object detection annotations with bounding boxes
+    - Binary labels (0=no object, 1=object present)
+    
+    Expected format for each sample:
+    {
+        "image": PIL.Image,
+        "wav": numpy array (audio waveform),
+        "objects": {
+            "category_name": [str],
+            "bbox": [[y1, x1, y2, x2]]  # normalized coordinates
+        },
+        "label": int (0 or 1)
+    }
+    """
+    
+    SUPPORTED_DATASET_PATHS = {
+        "OscarGD6/audio-prompt-coco-balanced-subset"
+    }
+    IS_MULTIMODAL = True
+    DEFAULT_OUTPUT_LEN = 64
+    
+    def _format_sample(self, example: dict) -> dict:
+        """
+        Format a single sample into the expected conversation format.
+        
+        Args:
+            example: Raw dataset sample
+            
+        Returns:
+            Formatted conversation with system, user, and assistant messages
+        """
+        system_msg = "You are a Vision Audio Language Model specialized in recognizing speech commands for object detection."
+        
+        # Extract target class from the prompt text
+        category_name = example["objects"]["category_name"][0]
+        
+        if example["label"] == 0:
+            category_name = f"No {category_name} detected"
+            y1, x1, y2, x2 = 0.0, 0.0, 0.0, 0.0
+        else:
+            y1, x1, y2, x2 = example["objects"]["bbox"][0]
+            x1, y1, x2, y2 = (
+                round(x1 * 1000),
+                round(y1 * 1000), 
+                round(x2 * 1000),
+                round(y2 * 1000),
+            )
+        
+        # User content with image and audio
+        user_content = [
+            {"type": "image", "image": example["image"]},
+            {"type": "audio", "audio": example["wav"]},
+        ]
+        
+        # Assistant response with object detection format
+        assistant_text = f"<|object_ref_start|>{category_name}<|object_ref_end|><|box_start|>({x1},{y1}),({x2},{y2})<|box_end|>"
+        
+        return [
+            {"role": "system", "content": [{"type": "text", "text": system_msg}]},
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
+        ]
+    
+    def _process_audio(self, wav_array: np.ndarray) -> dict:
+        """
+        Process audio waveform into format expected by the model.
+        
+        Args:
+            wav_array: Audio waveform as numpy array
+            
+        Returns:
+            Dictionary with processed audio data
+        """
+        # Convert to log-mel spectrogram using Whisper preprocessing
+        mel, n_frames = _waveform_to_logmel(wav_array)
+        
+        return {
+            "type": "audio",
+            "audio": mel,  # Use mel spectrogram 
+            "sample_rate": 16000,  # Whisper standard
+        }
+        
+    def sample(
+        self,
+        tokenizer: PreTrainedTokenizerBase,
+        num_requests: int,
+        output_len: Optional[int] = None,
+        enable_multimodal_chat: bool = True,
+        **kwargs,
+    ) -> list[SampleRequest]:
+        """
+        Sample requests from the Audio Prompt COCO dataset.
+        
+        Args:
+            tokenizer: Tokenizer for processing text
+            num_requests: Number of requests to sample
+            output_len: Expected output length (uses default if None)
+            enable_multimodal_chat: Whether to format as chat messages
+            
+        Returns:
+            List of SampleRequest objects
+        """
+        output_len = (output_len if output_len is not None else self.DEFAULT_OUTPUT_LEN)
+        sampled_requests = []
+        
+        for item in self.data:
+            if len(sampled_requests) >= num_requests:
+                break
+                
+            try:
+                # Format the sample into conversation format
+                conversation = self._format_sample(item)
+                
+                # Extract prompt (system + user messages)
+                system_content = conversation[0]["content"][0]["text"]
+                user_content = conversation[1]["content"]
+                
+                # Build text prompt (extract text parts)
+                text_parts = [system_content]
+                for content in user_content:
+                    if content["type"] == "text":
+                        text_parts.append(content["text"])
+                
+                prompt_text = " ".join(text_parts)
+                
+                # Process multimodal content
+                mm_content = {}
+                
+                # Process image
+                for content in user_content:
+                    if content["type"] == "image":
+                        mm_content.update(process_image(content["image"]))
+                        break
+                
+                # Process audio
+                for content in user_content:
+                    if content["type"] == "audio":
+                        audio_data = self._process_audio(content["audio"])
+                        mm_content["audio"] = audio_data
+                        break
+                
+                # Calculate prompt length
+                prompt_len = len(tokenizer(prompt_text).input_ids)
+                
+                # Apply chat formatting if enabled
+                if enable_multimodal_chat:
+                    prompt = self.apply_multimodal_chat_transformation(
+                        prompt_text, mm_content
+                    )
+                else:
+                    prompt = prompt_text
+                
+                sampled_requests.append(
+                    SampleRequest(
+                        prompt=prompt,
+                        prompt_len=prompt_len,
+                        expected_output_len=output_len,
+                        multi_modal_data=mm_content,
+                    )
+                )
+                
+            except Exception as e:
+                logger.warning(f"Skipping sample due to error: {e}")
+                continue
+        
+        self.maybe_oversample_requests(sampled_requests, num_requests)
+        return sampled_requests
