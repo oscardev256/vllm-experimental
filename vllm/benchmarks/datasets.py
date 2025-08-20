@@ -1750,7 +1750,8 @@ class AudioPromptCocoDataset(HuggingFaceDataset):
     """
     
     SUPPORTED_DATASET_PATHS = {
-        "OscarGD6/audio-prompt-coco-balanced-subset"
+        "OscarGD6/audio-prompt-coco-balanced-subset",
+        "OscarGD6/audio-prompt-coco-balanced"
     }
     IS_MULTIMODAL = True
     DEFAULT_OUTPUT_LEN = 64
