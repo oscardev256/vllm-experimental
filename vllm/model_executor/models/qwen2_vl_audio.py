@@ -119,7 +119,6 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
         hf_processor_mm_kwargs: Mapping[str, Any],
         out_mm_kwargs: MultiModalKwargs,
     ) -> Sequence[PromptUpdate]:
-        print("Inside _get_prompt_updates")
         hf_processor = self.info.get_hf_processor(**hf_processor_mm_kwargs)
         image_processor = self.info.get_image_processor(
             **hf_processor_mm_kwargs)
@@ -135,7 +134,6 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
         merge_length = image_processor.merge_size**2
 
         def get_replacement_qwen2vl(item_idx: int, modality: str): # Expansion of multimedia padding tokens.
-            print("Inside get_replacement_qwen2vl")
             if modality == "audio":
                 grid_thw = out_mm_kwargs["audio_length"][item_idx]
                 num_tokens = int(grid_thw.prod()) //2
@@ -160,7 +158,6 @@ class Qwen2VLAudioMultiModalProcessor(BaseMultiModalProcessor[Qwen2VLProcessingI
         hf_inputs: BatchFeature,
         hf_processor_mm_kwargs: Mapping[str, object],
     ) -> Mapping[str, MultiModalFieldConfig]:
-        print("Convert from HF to vLLM, Inside _get_mm_fields_config")
         return _qwen2vl_field_config(hf_inputs)
         #return _qwen2vl_audio_field_config(hf_inputs)
 
@@ -180,7 +177,6 @@ class Qwen2VLAudioDummyInputsBuilder(Qwen2VLDummyInputsBuilder):
         image_token: str = hf_processor.image_token
         video_token: str = hf_processor.video_token
         audio_token: str = "<|audio_pad|>"
-        print(f"Inside Qwen2VLDummyInputsBuilder, dummy data: {image_token * num_images + video_token * num_videos + audio_token * num_audios}")
         return image_token * num_images + video_token * num_videos + audio_token * num_audios
 
 
@@ -199,7 +195,6 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
 
     @classmethod
     def get_placeholder_str(cls, modality: str, i: int) -> Optional[str]:
-        print("Inside get_placeholder_str( get_placeholder_str( get_placeholder_str( get_placeholder_str( get_placeholder_str( ...........")
         if modality.startswith("image"):
             return "<|vision_start|><|image_pad|><|vision_end|>"
         if modality.startswith("video"):

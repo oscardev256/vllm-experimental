@@ -1692,9 +1692,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
         3. Extract information about the placeholder tokens from the
            processed token IDs.
         """
-        print("Inside BaseMultiModalProcessor, before _to_mm_items...")
         mm_items = self._to_mm_items(mm_data)
-        print("Inside BaseMultiModalProcessor, after _to_mm_items...")
         if tokenization_kwargs is None:
             tokenization_kwargs = {}
 

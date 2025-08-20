@@ -333,7 +333,6 @@ class MultiModalBatchedField(BaseMultiModalField):
         data: NestedTensors,
     ) -> Sequence[MultiModalFieldElem]:
         field_factory = self._field_factory(modality=modality, key=key)
-        print(f"Inside inputs.py, MultiModalBatchedField(BaseMultiModalField)")
         return [field_factory(item) for item in data]
 
     def _reduce_data(
@@ -375,7 +374,6 @@ class MultiModalFlatField(BaseMultiModalField):
         key: str,
         data: NestedTensors,
     ) -> Sequence[MultiModalFieldElem]:
-        print(f"Inside inputs.py, MultiModalFlatField(BaseMultiModalField)")
         field_factory = self._field_factory(modality=modality, key=key)
         if not is_list_of(self.slices, slice, check="all"):
             assert isinstance(data, torch.Tensor), \
