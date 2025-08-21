@@ -344,7 +344,7 @@ class Qwen2VLAudioForConditionalGeneration(Qwen2VLForConditionalGeneration):
             image_input = self._parse_and_validate_image_input(**kwargs)
             video_input = self._parse_and_validate_video_input(**kwargs)
 
-            if image_input is None and video_input is None and audio_mels is None:
+            if image_input is None and video_input is None:# and audio_mels is None:
                 inputs_embeds = None
             else:
                 if uses_mrope(self.config):
