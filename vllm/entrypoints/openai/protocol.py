@@ -20,7 +20,7 @@ from openai.types.chat.chat_completion_message import (
 from openai.types.responses import (ResponseFunctionToolCall,
                                     ResponseInputItemParam, ResponseOutputItem,
                                     ResponsePrompt, ResponseReasoningItem,
-                                    ResponseStatus, ResponseTextConfig)
+                                    ResponseStatus, ResponseFormatTextConfig)
 from openai.types.responses.response import ToolChoice
 from openai.types.responses.tool import Tool
 from openai.types.shared import Metadata, Reasoning
@@ -272,7 +272,7 @@ class ResponsesRequest(OpenAIBaseModel):
     store: Optional[bool] = True
     stream: Optional[bool] = False
     temperature: Optional[float] = None
-    text: Optional[ResponseTextConfig] = None
+    text: Optional[ResponseFormatTextConfig] = None
     tool_choice: ToolChoice = "auto"
     tools: list[Tool] = Field(default_factory=list)
     top_logprobs: Optional[int] = 0
@@ -1769,7 +1769,7 @@ class ResponsesResponse(OpenAIBaseModel):
     reasoning: Optional[Reasoning] = None
     service_tier: Literal["auto", "default", "flex", "scale", "priority"]
     status: ResponseStatus
-    text: Optional[ResponseTextConfig] = None
+    text: Optional[ResponseFormatTextConfig] = None
     top_logprobs: int
     truncation: Literal["auto", "disabled"]
     usage: Optional[ResponseUsage] = None
