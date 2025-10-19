@@ -2215,9 +2215,12 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
             mm_counts={modality: 1},
         )
         dummy_mm_data = dummy_decoder_data.multi_modal_data
+        print(f"gpu global runner: dummy_mm_data shape = {dummy_mm_data['pixel_values'].shape}")
 
         # Result in the maximum GPU consumption of the model
         dummy_mm_item = dummy_mm_data.get_item(modality=modality, item_index=0)
+        print(f"gpu global runner: dummy_mm_item = {dummy_mm_item}")
+        print(f"gpu global runner: max_items_per_batch = {max_items_per_batch}")
 
         return next(mm_kwargs_group
                     for _, _, mm_kwargs_group in group_mm_kwargs_by_modality(
@@ -2600,7 +2603,8 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
                         dummy_modality,
                         max_mm_items_per_batch,
                     )
-
+                    print(f"batched_dummy_mm_inputs pixel_values shape = {batched_dummy_mm_inputs['pixel_values'].shape}")
+                    print(f"batched_dummy_mm_inputs image_grid_thw shape = {batched_dummy_mm_inputs['image_grid_thw'].shape}")
                     # Run multimodal encoder.
                     dummy_encoder_outputs = \
                         self.model.get_multimodal_embeddings(

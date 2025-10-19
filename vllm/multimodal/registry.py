@@ -337,7 +337,7 @@ class MultiModalRegistry:
         processor = self.create_processor(model_config, disable_cache=False)
         profiler = MultiModalProfiler(processor)
         dummy_data = profiler.get_decoder_dummy_data(seq_len, mm_counts)
-
+        #print(f"Create dummy data for profiling the memory usage of a model: dummy_data = {dummy_data}")
         # Having more tokens is over-conservative but otherwise fine
         token_ids = dummy_data.prompt_token_ids
         if len(token_ids) < seq_len:

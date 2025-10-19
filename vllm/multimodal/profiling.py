@@ -169,7 +169,7 @@ class MultiModalProfiler(Generic[_I]):
         factory = self.dummy_inputs
         processor_inputs = factory.get_dummy_processor_inputs(
             seq_len, mm_counts)
-
+        print("In profiler!!!!!!!!!!!!!!!!!!!!!!!")
         return self.processor.apply(
             prompt=processor_inputs.prompt,
             mm_data=processor_inputs.mm_data,
@@ -221,7 +221,7 @@ class MultiModalProfiler(Generic[_I]):
                 total_len,
                 str(self._get_mm_num_tokens(mm_inputs)),
             )
-
+        print("In get_encoder_dummy_data!!!!!!!!!!!!!!!!!!")
         return DummyEncoderData(encoder_prompt_token_ids)
 
     def get_decoder_dummy_data(
@@ -250,6 +250,7 @@ class MultiModalProfiler(Generic[_I]):
         if total_len < seq_len:
             prompt_token_ids.extend([0] * (seq_len - total_len))
 
+        print(f"In get_decoder_dummy_data: mm_kwargs shape = {mm_inputs['mm_kwargs']['pixel_values'].shape}!!!!!!!!!!!!!!!!!!")
         return DummyDecoderData(
             prompt_token_ids=prompt_token_ids,
             multi_modal_data=mm_inputs["mm_kwargs"],
@@ -289,6 +290,7 @@ class MultiModalProfiler(Generic[_I]):
             return max_tokens_per_item
 
         mm_inputs = self._get_dummy_mm_inputs(seq_len, mm_counts)
+        print("In _get_mm_max_tokens!!!!!!!!!!!!!!!!!!")
         return self._get_mm_num_tokens(mm_inputs,
                                        mm_embeddings_only=mm_embeddings_only)
 

@@ -1027,6 +1027,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
         mm_data: MultiModalDataDict,
         hf_processor_mm_kwargs: Mapping[str, object],
     ) -> MultiModalInputs:
+        print("Base processor!!!!!!!!!!!!!!!!!!!!!!!")
         return self.apply(prompt, mm_data, hf_processor_mm_kwargs)
 
     def _get_data_parser(self) -> MultiModalDataParser:
@@ -1290,7 +1291,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             that the prompt corresponds to multi-modal items.
         """
         if isinstance(prompt, str):
-            #print("111111111111111111111111111111111111111")
+            print("111111111111111111111111111111111111111")
             if enable_hf_prompt_update:
                 print("1AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
                 return self._apply_hf_processor_text_mm(
@@ -1299,11 +1300,11 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
                     hf_processor_mm_kwargs=hf_processor_mm_kwargs,
                     tokenization_kwargs=tokenization_kwargs,
                 )
-            #print("1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+            print("1BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
             prompt_ids = self._apply_hf_processor_text_only(
                 prompt, tokenization_kwargs)
         else:
-            #print("22222222222222222222222222222222222222222222")
+            print("22222222222222222222222222222222222222222222")
             prompt_ids = self._apply_hf_processor_tokens_only(prompt)
 
         mm_processed_data = self._apply_hf_processor_mm_only(
@@ -1312,6 +1313,10 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             tokenization_kwargs=tokenization_kwargs,
         )
 
+        print(f"In _apply_hf_processor_main: mm_processed_data = {mm_processed_data}")
+        print(f"In _apply_hf_processor_main: pixel_values shape = {mm_processed_data['pixel_values'].shape}")
+        print(f"In _apply_hf_processor_main: image_grid_thw shape = {mm_processed_data['image_grid_thw'].shape}")
+        print(f"In _apply_hf_processor_main: image_grid_thw values = {mm_processed_data['image_grid_thw']}")
         return prompt_ids, mm_processed_data, False
 
     def _get_cache_missing_items(
@@ -1406,6 +1411,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             enable_hf_prompt_update=True,
         )
 
+        print(f"In processing.py: mm_processed_data = {mm_processed_data}")
         mm_kwargs = MultiModalKwargs.from_hf_inputs(
             mm_processed_data,
             self._get_mm_fields_config(mm_processed_data,
@@ -1471,6 +1477,8 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             enable_hf_prompt_update=False,
         )
 
+        print(f"In _cached_apply_hf_processo: mm_processed_data = {mm_missing_processed_data}")
+        print(f"In _cached_apply_hf_processo: pixel_values shape = {mm_missing_processed_data['pixel_values'].shape}")
         mm_missing_kwargs = MultiModalKwargs.from_hf_inputs(
             mm_missing_processed_data,
             self._get_mm_fields_config(mm_missing_processed_data,
@@ -1723,6 +1731,9 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
             for modality, placeholders in mm_placeholders.items()
         }
 
+        print(f"mm_hashes: {mm_hashes}")
+        print(f"mm_kwargs: pixel_values shape = {mm_kwargs['pixel_values'].shape}")
+        print(f"mm_placeholder_ranges: {mm_placeholder_ranges}")
         return MultiModalInputs(
             type="multimodal",
             prompt=prompt,
