@@ -22,17 +22,17 @@ if __name__ == '__main__':
       #model="OscarGD6/qwen2vl-nutrition-label-detection-merged-weights",
       #model="Qwen/Qwen2-VL-2B-Instruct",
       model="OscarGD6/Isaac-0.1",
-      max_model_len=4992,  # Use the suggested max length from error message
-      #max_num_batched_tokens=256,
-      #max_num_seqs=1,
-      #limit_mm_per_prompt={"image": 1},
+      max_model_len=256,#4992,  # Use the suggested max length from error message
+      max_num_batched_tokens=256,
+      max_num_seqs=1,
+      limit_mm_per_prompt={"image": 1},
       #mm_processor_kwargs={
       #    "max_pixels": 128 * 28 * 28,  # or your target pixel count
       #},
       #dtype="bfloat16",
       gpu_memory_utilization=0.82,  # ← reduce from 0.9 to 0.7
       #cpu_offload_gb=10,              # Reserve 10 GB on CPU
-      quantization="bitsandbytes",
+      #quantization="bitsandbytes",
       enforce_eager=True,
       trust_remote_code=True
   )
@@ -63,8 +63,10 @@ if __name__ == '__main__':
   from isaac import IsaacProcessor
   from transformers import AutoTokenizer
   
+  #from modular_isaac import IsaacProcessor as OfficialIsaacProcessor
   hf_repo = "PerceptronAI/Isaac-0.1"
   
+
   # Load tokenizer from HuggingFace and create our processor
   tokenizer = AutoTokenizer.from_pretrained(hf_repo, trust_remote_code=True)
   processor = IsaacProcessor(tokenizer=tokenizer)
@@ -153,13 +155,13 @@ if __name__ == '__main__':
   
   # Use Isaac model's recommended sampling parameters
   sampling_params = SamplingParams(
-      #temperature=0.0,        # Slightly higher than 0 for some creativity
-      temperature=0.01,        # Slightly higher than 0 for some creativity
-      top_p=0.001,             # Nucleus sampling
-      top_k=1,
+      temperature=0.0,        # Slightly higher than 0 for some creativity
+      #temperature=0.01,        # Slightly higher than 0 for some creativity
+      #top_p=0.001,             # Nucleus sampling
+      #top_k=1,
       max_tokens=512,        # Longer responses
-      repetition_penalty=1.0,  # Reduce repetition
-      stop=["<|im_end|>", "<|endoftext|>"]
+      #repetition_penalty=1.0,  # Reduce repetition
+      #stop=["<|im_end|>", "<|endoftext|>"]
   )
   #outputs = llm.generate(inputs, sampling_params)
   #sampling_params = SamplingParams(temperature=0.0, max_tokens=500)
@@ -167,4 +169,7 @@ if __name__ == '__main__':
   outputs = llm.generate(inputs, sampling_params)
   
   print(f"Image inference result: '{outputs[0].outputs[0].text}'")
+  print(f"Full inference result: '{outputs}'")
+  decoded_text = tokenizer.decode(outputs[0].outputs[0].token_ids)
+  print(f"Decoded text: {decoded_text}")
   print("End of process...")
