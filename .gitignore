@@ -4,6 +4,9 @@
 # vllm-flash-attn built from source
 vllm/vllm_flash_attn/*
 
+# Claude context file - local only
+CLAUDE.md
+
 # triton jit 
 .triton
 

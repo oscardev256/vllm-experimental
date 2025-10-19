@@ -838,7 +838,9 @@ def process_vision_for_patches(
     images = images.permute(0, 3, 1, 2)
 
     _, _, oh, ow = images.shape
-    print(f"DEBUG: About to call get_image_size_for_max_num_patches with oh={oh}, ow={ow}, patch_size={patch_size}, pixel_shuffle_scale={pixel_shuffle_scale}")
+    max_num_patches = 512#6144
+    min_num_patches = 256
+    print(f"DEBUG: About to call get_image_size_for_max_num_patches with oh={oh}, ow={ow}, patch_size={patch_size}, min_num_patches={min_num_patches}, max_num_patches={max_num_patches}, pixel_shuffle_scale={pixel_shuffle_scale}")
     tgt_h, tgt_w = get_image_size_for_max_num_patches(
         oh, ow, patch_size, max_num_patches, min_num_patches=min_num_patches, pixel_shuffle_scale=pixel_shuffle_scale
     )
@@ -1138,6 +1140,8 @@ class IsaacProcessor:
         if text is not None:
             if hasattr(self.tokenizer, "__call__"):
                 result.update(self.tokenizer(text, **kwargs))
+                print(f"IsaacProcessor __call__: input_ids= {result["input_ids"]}")
+                print(f"IsaacProcessor __call__: tokenizer= {self.tokenizer}")
             else:
                 result["input_ids"] = [[ord(c) for c in text]]
         if images is not None:
