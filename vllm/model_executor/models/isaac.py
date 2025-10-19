@@ -1120,7 +1120,7 @@ class IsaacConfig(Qwen3Config):
         if vision_config is None:
             self.vision_config = PixelShuffleSiglip2VisionConfig(
                 pixel_shuffle_scale_factor=pixel_shuffle_scale,
-                num_patches=self.max_num_patches,
+                num_patches=self.vision_max_num_patches,
             )
         else:
             self.vision_config = PixelShuffleSiglip2VisionConfig(**vision_config)
