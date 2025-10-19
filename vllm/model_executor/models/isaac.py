@@ -914,12 +914,11 @@ class IsaacImageProcessorFast(BaseImageProcessorFast):
     model_input_names = ["pixel_values", "image_grid_thw"]
 
     def __init__(self, **kwargs):
-        # Isaac-specific
-        self.patch_size = kwargs.pop("patch_size", self.patch_size)
-        self.merge_size = kwargs.pop("merge_size", self.merge_size)
-        self.max_num_patches = kwargs.pop("max_num_patches", self.max_num_patches)
-        self.min_num_patches = kwargs.pop("min_num_patches", self.min_num_patches)
-        self.pixel_shuffle_scale = kwargs.pop("pixel_shuffle_scale", self.pixel_shuffle_scale)
+        # Isaac-specific - use class defaults for self-reference
+        self.vision_patch_size = kwargs.pop("vision_patch_size", self.patch_size)
+        self.vision_max_num_patches = kwargs.pop("vision_max_num_patches", self.max_num_patches)
+        self.vision_min_num_patches = kwargs.pop("vision_min_num_patches", None)
+        self.pixel_shuffle_scale = kwargs.pop("pixel_shuffle_scale", 2)
         
         print(f"DEBUG IsaacImageProcessorFast.__init__: pixel_shuffle_scale = {self.pixel_shuffle_scale}")
 
@@ -952,8 +951,7 @@ class IsaacImageProcessorFast(BaseImageProcessorFast):
         kwargs.setdefault("disable_grouping", self.disable_grouping)    # ← add this
 
         # Isaac-specific knobs so they propagate if caller omits them
-        kwargs.setdefault("patch_size", self.patch_size)
-        kwargs.setdefault("merge_size", self.merge_size)
+        kwargs.setdefault("vision_patch_size", self.vision_patch_size)
 
         return super().preprocess(images, **kwargs)
 
@@ -1011,8 +1009,8 @@ class IsaacImageProcessorFast(BaseImageProcessorFast):
             patches, dims_virtual = process_vision_for_patches(
                 image_tensor,
                 patch_size=patch_size,
-                max_num_patches=self.max_num_patches,
-                min_num_patches=self.min_num_patches,
+                max_num_patches=self.vision_max_num_patches,
+                min_num_patches=self.vision_min_num_patches,
                 pixel_shuffle_scale=self.pixel_shuffle_scale,
             )
             
@@ -1056,9 +1054,9 @@ class IsaacImageProcessorFast(BaseImageProcessorFast):
         if images_kwargs is None:
             images_kwargs = {}
 
-        patch_size = images_kwargs.get("patch_size", self.patch_size)
-        max_num_patches = images_kwargs.get("max_num_patches", self.max_num_patches)
-        min_num_patches = images_kwargs.get("min_num_patches", self.min_num_patches)
+        patch_size = images_kwargs.get("vision_patch_size", self.vision_patch_size)
+        max_num_patches = images_kwargs.get("vision_max_num_patches", self.vision_max_num_patches)
+        min_num_patches = images_kwargs.get("vision_min_num_patches", self.vision_min_num_patches)
         pixel_shuffle_scale = images_kwargs.get("pixel_shuffle_scale", self.pixel_shuffle_scale)
 
         rh, rw = get_image_size_for_max_num_patches(
@@ -1081,12 +1079,11 @@ class IsaacConfig(Qwen3Config):
     def __init__(
         self,
         # Isaac-specific vision parameters
-        patch_size: int = 16,
-        max_num_patches: int = 256,
-        min_num_patches: Optional[int] = None,
+        vision_patch_size: int = 16,
+        vision_max_num_patches: int = 256,
+        vision_min_num_patches: Optional[int] = None,
         pixel_shuffle_scale: int = 1,
-        merge_size: int = 2,
-        vision_token: str = "<image>",
+        vision_token: str = "<|image_pad|>",
         # Add vision_config parameter
         vision_config: Optional[Dict] = None,
         # Qwen3 text model parameters - set defaults if not provided
@@ -1111,18 +1108,17 @@ class IsaacConfig(Qwen3Config):
             **kwargs
         )
         # Add Isaac-specific vision parameters
-        self.patch_size = patch_size
-        self.max_num_patches = max_num_patches
-        self.min_num_patches = min_num_patches
+        self.vision_patch_size = vision_patch_size
+        self.vision_max_num_patches = vision_max_num_patches
+        self.vision_min_num_patches = vision_min_num_patches
         self.pixel_shuffle_scale = pixel_shuffle_scale
-        self.merge_size = merge_size
         self.vision_token = vision_token
         
         # Add vision_config
         if vision_config is None:
             self.vision_config = PixelShuffleSiglip2VisionConfig(
                 pixel_shuffle_scale_factor=pixel_shuffle_scale,
-                num_patches=max_num_patches,
+                num_patches=self.max_num_patches,
             )
         else:
             self.vision_config = PixelShuffleSiglip2VisionConfig(**vision_config)
@@ -1224,9 +1220,8 @@ class IsaacProcessingInfo(BaseProcessingInfo):
         cfg = self.get_hf_config()
         return IsaacProcessor(
             image_processor=IsaacImageProcessorFast(
-                patch_size=cfg.patch_size,
-                max_num_patches=cfg.max_num_patches,
-                merge_size=cfg.merge_size,
+                patch_size=cfg.vision_patch_size,
+                max_num_patches=cfg.vision_max_num_patches,
                 pixel_shuffle_scale=cfg.pixel_shuffle_scale,
             ),
             vision_token=cfg.vision_token,
@@ -1245,7 +1240,7 @@ class IsaacProcessingInfo(BaseProcessingInfo):
         self, seq_len: int, mm_counts: Mapping[str, int],
     ) -> Mapping[str, int]:
         cfg = self.get_hf_config()
-        return {"image": cfg.max_num_patches // (cfg.merge_size ** 2)}
+        return {"image": cfg.vision_max_num_patches}
 
 
 class IsaacMultiModalProcessor(BaseMultiModalProcessor):
